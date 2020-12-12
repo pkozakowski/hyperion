@@ -22,6 +22,59 @@ def fold(f, tree):
     return f(tree)
 
 
+def render(statements):
+    def render_node(node):
+        def render_identifier():
+            scope = node.scope
+            if scope:
+                scope += '/'
+
+            namespace = node.namespace
+            if namespace:
+                namespace += '.'
+
+            return scope + namespace + node.name
+
+        def render_tuple():
+            if len(node) == 1:
+                return f'({node[0]},)'
+            else:
+                return '(' + ', '.join(map(str, node)) + ')'
+
+        def render_call():
+            args = ', '.join(
+                f'{name}={value}'.format(name, value)
+                for (name, value) in node.arguments
+            )
+            return f'@{node.identifier}({args})'
+
+        render_table = {
+            ast.Import: lambda: f'import {node.namespace}',
+            ast.Namespace: lambda: '.'.join(node.path),
+            ast.Binding: lambda: (
+                f'{node.identifier} = {node.expr}'
+            ),
+            ast.Identifier: render_identifier,
+            ast.Scope: lambda: '/'.join(node.path),
+            ast.Dict: lambda: '{' + ', '.join(
+                f'{k}: {v}' for (k, v) in node.items()
+            ) + '}',
+            ast.List: lambda: '[' + ', '.join(map(str, node)) + ']',
+            ast.Tuple: render_tuple,
+            ast.Macro: lambda: f'%{node.name}',
+            ast.Reference: lambda: f'@{node.identifier}',
+            ast.Call: render_call,
+            ast.String: lambda: repr(node),  # Add quotes.
+        }
+
+        if type(node) in render_table:
+            return render_table[type(node)]()
+        else:
+            return node
+
+    return '\n'.join(fold(render_node, statement) for statement in statements)
+
+
 def append_scope(scope, identifier):
     return identifier._replace(
         scope=ast.Scope(path=(identifier.scope.path + [scope]))
