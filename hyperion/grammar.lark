@@ -1,0 +1,52 @@
+start: statement? (_NL+ statement)* _NL*
+
+?statement: import_ | binding
+
+import_: "import" namespace
+namespace: (name ".")* name
+binding: identifier "=" expr
+
+identifier: [scope "/"] [namespace "."] name
+scope: (name "/")* name
+name: CNAME
+
+?expr: _NL* expr_ _NL*
+?expr_: dict
+      | list
+      | tuple
+      | macro
+      | reference
+      | call
+      | "(" expr ")"
+      | STRING        -> string
+      | SIGNED_NUMBER -> number
+      | "True"        -> true
+      | "False"       -> false
+      | "None"        -> none
+
+dict: "{" _cs_list{entry}? "}"
+entry: expr ":" expr
+_cs_list{item}: item ("," item)* ["," _NL*]
+cs_list{item}: _cs_list{item}
+
+list: "[" _cs_list{expr}? "]"
+
+tuple: expr "," [expr ("," expr)* ["," _NL*]]
+     | "(" ")"
+
+macro: "%" name
+
+reference: "@" identifier
+call: "@" identifier "(" cs_list{argument}? ")"
+argument: name "=" expr
+
+_NL: /(\r?\n)+\s*/
+
+%import common.CNAME
+%import common.SIGNED_NUMBER
+%import common.WS_INLINE
+%import python.COMMENT
+%import python.STRING
+
+%ignore COMMENT
+%ignore WS_INLINE
