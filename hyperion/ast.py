@@ -33,7 +33,8 @@ class Call(collections.namedtuple('Call', ['identifier', 'arguments'])):
 
 class String(str):
 
-    def __new__(cls, items):
-        (text,) = items
+    @classmethod
+    def from_tokens(cls, tokens):
+        (text,) = tokens
         # Strip the quotes.
-        return super().__new__(cls, text[1:-1])
+        return cls(text[1:-1])

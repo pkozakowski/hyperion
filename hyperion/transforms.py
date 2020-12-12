@@ -71,6 +71,40 @@ def render(statements):
     return '\n'.join(fold(render_node, statement) for statement in statements)
 
 
+def make_identifier(namespace_path, name):
+    return ast.Identifier(
+        scope=ast.Scope(path=[]),
+        namespace=ast.Namespace(path=namespace_path),
+        name=name,
+    )
+
+
+def expressions_to_calls(statements):
+    def convert_node(node):
+        if type(node) is ast.UnaryOp:
+            return ast.Call(
+                identifier=make_identifier(['hyperion', 'gin'], '_eval_unary'),
+                arguments=[
+                    ('op', ast.String(node.operator)),
+                    ('v', node.operand),
+                ]
+            )
+
+        if type(node) is ast.BinaryOp:
+            return ast.Call(
+                identifier=make_identifier(['hyperion', 'gin'], '_eval_binary'),
+                arguments=[
+                    ('l', node.left),
+                    ('op', ast.String(node.operator)),
+                    ('r', node.right),
+                ]
+            )
+
+        return node
+
+    return [fold(convert_node, statement) for statement in statements]
+
+
 def append_scope(scope, identifier):
     return identifier._replace(
         scope=ast.Scope(path=(identifier.scope.path + [scope]))
@@ -111,5 +145,6 @@ def calls_to_evaluated_references(statements):
     return statements
 
 
-def expressions_to_evaluated_references(statements):
-    raise NotImplementedError
+def preprocess_config(statements):
+    statements = expressions_to_calls(statements)
+    return calls_to_evaluated_references(statements)

@@ -58,7 +58,7 @@ class GinTransformer(lark.Transformer):
     reference = ast.Reference._make
     call = ast.Call._make
     argument = tuple
-    string = ast.String
+    string = ast.String.from_tokens
 
     dict = ast.Dict
     list = ast.List
@@ -93,7 +93,9 @@ class GinTransformer(lark.Transformer):
     is_not = binary_op('is_not')
     in_ = binary_op('in_')
     not_in = binary_op('not_in')
-    not_ = binary_op('not_')
+    not_ = unary_op('not_')
+    land = binary_op('land')
+    lor = binary_op('lor')
 
 
 grammar_path = os.path.join(os.path.dirname(__file__), 'grammar.lark')

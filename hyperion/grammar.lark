@@ -32,8 +32,7 @@ cs_list{item}: _cs_list{item}
 
 list: "[" _cs_list{expr}? "]"
 
-tuple: expr "," [expr ("," expr)* ["," _NL*]]
-     | "(" ")"
+tuple: "(" _cs_list{expr}? ")"
 
 call: "@" identifier "(" cs_list{argument}? ")"
 argument: name "=" expr
@@ -60,7 +59,7 @@ argument: name "=" expr
 ?xor_op: and_op "^" and_op -> xor
        | and_op
 ?or_op: xor_op "|" xor_op -> or_
-       | xor_op
+      | xor_op
 ?cmp_op: or_op "==" or_op       -> eq
        | or_op "!=" or_op       -> ne
        | or_op "<>" or_op       -> ne
