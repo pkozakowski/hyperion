@@ -5,19 +5,15 @@ def fold(f, tree):
     def fold_seq(seq):
         return type(seq)(fold(f, value) for value in seq)
 
-    if isinstance(tree, (ast.List, ast.Tuple)):
+    if type(tree) in (ast.List, ast.Tuple, tuple):
         tree = fold_seq(tree)
-    elif isinstance(tree, ast.Dict):
+    elif type(tree) is ast.Dict:
         tree = ast.Dict(
             (fold(f, key), fold(f, value)) for (key, value) in tree.items()
         )
-    elif isinstance(tree, tuple):
-        if 'hyperion.ast' in str(type(tree)):
-            # Namedtuple.
-            tree = type(tree)(*[fold(f, child) for child in tree])
-        else:
-            # Ordinary tuple.
-            tree = fold_seq(tree)
+    elif isinstance(tree, tuple) and 'hyperion.ast' in str(type(tree)):
+        # Namedtuple.
+        tree = type(tree)(*[fold(f, child) for child in tree])
 
     return f(tree)
 
@@ -95,7 +91,7 @@ def calls_to_evaluated_references(statements):
     calls_with_args = []
 
     def convert_node(node):
-        if isinstance(node, ast.Call) and node.arguments:
+        if type(node) is ast.Call and node.arguments:
             nonlocal call_index
             scope = f'_call_{call_index}'
             call_index += 1
