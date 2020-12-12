@@ -60,3 +60,7 @@ def calls_to_evaluated_references(statements):
         for (name, value) in arguments
     ]
     return statements
+
+
+def expressions_to_evaluated_references(statements):
+    raise NotImplementedError

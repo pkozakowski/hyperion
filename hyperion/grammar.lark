@@ -10,19 +10,20 @@ identifier: [scope "/"] [namespace "."] name
 scope: (name "/")* name
 name: CNAME
 
-?expr: _NL* expr_ _NL*
-?expr_: dict
-      | list
-      | tuple
-      | macro
-      | reference
-      | call
-      | "(" expr ")"
-      | STRING        -> string
-      | SIGNED_NUMBER -> number
-      | "True"        -> true
-      | "False"       -> false
-      | "None"        -> none
+?expr: _nl{or_op}
+
+?atom: dict
+     | list
+     | tuple
+     | call
+     | "(" expr ")"
+     | "%" name       -> macro
+     | "@" identifier -> reference
+     | STRING         -> string
+     | SIGNED_NUMBER  -> number
+     | "True"         -> true
+     | "False"        -> false
+     | "None"         -> none
 
 dict: "{" _cs_list{entry}? "}"
 entry: expr ":" expr
@@ -34,11 +35,52 @@ list: "[" _cs_list{expr}? "]"
 tuple: expr "," [expr ("," expr)* ["," _NL*]]
      | "(" ")"
 
-macro: "%" name
-
-reference: "@" identifier
 call: "@" identifier "(" cs_list{argument}? ")"
 argument: name "=" expr
+
+?pow_op: atom "**" atom -> pow
+       | atom
+?unary_op: "+" pow_op -> pos
+         | "-" pow_op -> neg
+         | "~" pow_op -> bnot
+         | pow_op
+?mul_op: unary_op "*" unary_op  -> mul
+       | unary_op "/" unary_op  -> div
+       | unary_op "//" unary_op -> idiv
+       | unary_op "%" unary_op  -> mod
+       | unary_op
+?add_op: mul_op "+" mul_op -> add
+       | mul_op "-" mul_op -> sub
+       | mul_op
+?shift_op: add_op "<<" add_op -> lshift
+         | add_op ">>" add_op -> rshift
+         | add_op
+?band_op: shift_op "&" shift_op -> band
+        | shift_op
+?xor_op: band_op "^" band_op -> xor
+       | band_op
+?bor_op: xor_op "|" xor_op -> bor
+       | xor_op
+?cmp_op: bor_op "==" bor_op       -> eq
+       | bor_op "!=" bor_op       -> neq
+       | bor_op "<>" bor_op       -> neq
+       | bor_op "<" bor_op        -> lt
+       | bor_op ">" bor_op        -> gt
+       | bor_op "<=" bor_op       -> leq
+       | bor_op ">=" bor_op       -> geq
+       | bor_op "is" bor_op       -> is
+       | bor_op "is" "not" bor_op -> is_not
+       | bor_op "in" bor_op       -> in
+       | bor_op "not" "in" bor_op -> not_in
+       | bor_op
+?not_op: "not" cmp_op -> not
+       | cmp_op
+?and_op: not_op "and" not_op -> and
+       | not_op
+?or_op: and_op "or" and_op -> or
+      | and_op
+
+_nl{item}: _NL* item _NL*
 
 _NL: /(\r?\n)+\s*/
 
