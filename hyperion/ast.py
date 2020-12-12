@@ -10,6 +10,8 @@ Identifier = collections.namedtuple(
 Scope = collections.namedtuple('Scope', ['path'])
 Macro = collections.namedtuple('Macro', ['name'])
 Reference = collections.namedtuple('Reference', ['identifier'])
+UnaryOp = collections.namedtuple('UnaryOp', ['operator', 'operand'])
+BinaryOp = collections.namedtuple('BinaryOp', ['left', 'operator', 'right'])
 
 
 class Dict(dict): pass

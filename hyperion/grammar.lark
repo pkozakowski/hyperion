@@ -10,7 +10,7 @@ identifier: [scope "/"] [namespace "."] name
 scope: (name "/")* name
 name: CNAME
 
-?expr: _nl{or_op}
+?expr: _nl{lor_op}
 
 ?atom: dict
      | list
@@ -42,11 +42,11 @@ argument: name "=" expr
        | atom
 ?unary_op: "+" pow_op -> pos
          | "-" pow_op -> neg
-         | "~" pow_op -> bnot
+         | "~" pow_op -> inv
          | pow_op
 ?mul_op: unary_op "*" unary_op  -> mul
-       | unary_op "/" unary_op  -> div
-       | unary_op "//" unary_op -> idiv
+       | unary_op "/" unary_op  -> truediv
+       | unary_op "//" unary_op -> floordiv
        | unary_op "%" unary_op  -> mod
        | unary_op
 ?add_op: mul_op "+" mul_op -> add
@@ -55,30 +55,30 @@ argument: name "=" expr
 ?shift_op: add_op "<<" add_op -> lshift
          | add_op ">>" add_op -> rshift
          | add_op
-?band_op: shift_op "&" shift_op -> band
-        | shift_op
-?xor_op: band_op "^" band_op -> xor
-       | band_op
-?bor_op: xor_op "|" xor_op -> bor
+?and_op: shift_op "&" shift_op -> and_
+       | shift_op
+?xor_op: and_op "^" and_op -> xor
+       | and_op
+?or_op: xor_op "|" xor_op -> or_
        | xor_op
-?cmp_op: bor_op "==" bor_op       -> eq
-       | bor_op "!=" bor_op       -> neq
-       | bor_op "<>" bor_op       -> neq
-       | bor_op "<" bor_op        -> lt
-       | bor_op ">" bor_op        -> gt
-       | bor_op "<=" bor_op       -> leq
-       | bor_op ">=" bor_op       -> geq
-       | bor_op "is" bor_op       -> is
-       | bor_op "is" "not" bor_op -> is_not
-       | bor_op "in" bor_op       -> in
-       | bor_op "not" "in" bor_op -> not_in
-       | bor_op
-?not_op: "not" cmp_op -> not
+?cmp_op: or_op "==" or_op       -> eq
+       | or_op "!=" or_op       -> ne
+       | or_op "<>" or_op       -> ne
+       | or_op "<" or_op        -> lt
+       | or_op ">" or_op        -> gt
+       | or_op "<=" or_op       -> le
+       | or_op ">=" or_op       -> ge
+       | or_op "is" or_op       -> is_
+       | or_op "is" "not" or_op -> is_not
+       | or_op "in" or_op       -> in_
+       | or_op "not" "in" or_op -> not_in
+       | or_op
+?not_op: "not" cmp_op -> not_
        | cmp_op
-?and_op: not_op "and" not_op -> and
-       | not_op
-?or_op: and_op "or" and_op -> or
-      | and_op
+?land_op: not_op "and" not_op -> land
+        | not_op
+?lor_op: land_op "or" land_op -> lor
+       | land_op
 
 _nl{item}: _NL* item _NL*
 

@@ -5,7 +5,7 @@ def fold(f, tree):
     def fold_seq(seq):
         return type(seq)(fold(f, value) for value in seq)
 
-    if type(tree) in (ast.List, ast.Tuple, tuple):
+    if type(tree) in (ast.List, ast.Tuple, list, tuple):
         tree = fold_seq(tree)
     elif type(tree) is ast.Dict:
         tree = ast.Dict(
