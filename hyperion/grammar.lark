@@ -1,4 +1,4 @@
-start: statement? (_NL+ statement)* _NL*
+start: statement? (statement)*
 
 ?statement: import_ | binding
 
@@ -10,7 +10,7 @@ identifier: [scope "/"] [namespace "."] name
 scope: (name "/")* name
 name: CNAME
 
-?expr: _nl{lor_op}
+?expr: lor_op
 
 ?atom: dict
      | list
@@ -27,7 +27,7 @@ name: CNAME
 
 dict: "{" _cs_list{entry}? "}"
 entry: expr ":" expr
-_cs_list{item}: item ("," item)* ["," _NL*]
+_cs_list{item}: item ("," item)* [","]
 cs_list{item}: _cs_list{item}
 
 list: "[" _cs_list{expr}? "]"
@@ -79,15 +79,11 @@ argument: name "=" expr
 ?lor_op: land_op "or" land_op -> lor
        | land_op
 
-_nl{item}: _NL* item _NL*
-
-_NL: /(\r?\n)+\s*/
-
 %import common.CNAME
 %import common.SIGNED_NUMBER
-%import common.WS_INLINE
+%import common.WS
 %import python.COMMENT
 %import python.STRING
 
 %ignore COMMENT
-%ignore WS_INLINE
+%ignore WS

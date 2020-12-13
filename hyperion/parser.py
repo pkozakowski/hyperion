@@ -100,11 +100,11 @@ class GinTransformer(lark.Transformer):
 
 grammar_path = os.path.join(os.path.dirname(__file__), 'grammar.lark')
 with open(grammar_path, 'r') as f:
-    _parser = lark.Lark(f.read(), start='start')
+    grammar = lark.Lark(f.read(), start='start')
 
 
 def parse_bindings(text):
-    parse_tree = _parser.parse(text)
+    parse_tree = grammar.parse(text)
     statements = GinTransformer().transform(parse_tree)
     return statements
 
