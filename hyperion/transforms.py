@@ -2,18 +2,20 @@ from hyperion import ast
 
 
 def fold(f, tree):
-    def fold_seq(seq):
-        return type(seq)(fold(f, value) for value in seq)
+    def fold_tuple(t):
+        return tuple(fold(f, value) for value in t)
 
-    if type(tree) in (ast.List, ast.Tuple, list, tuple):
-        tree = fold_seq(tree)
+    if type(tree) is tuple:
+        tree = fold_tuple(tree)
+    elif type(tree) in (ast.Tuple, ast.List):
+        tree = type(tree)(items=fold_tuple(tree.items))
     elif type(tree) is ast.Dict:
-        tree = ast.Dict(
-            (fold(f, key), fold(f, value)) for (key, value) in tree.items()
-        )
+        tree = ast.Dict(items=tuple(
+            (fold(f, key), fold(f, value)) for (key, value) in tree.items
+        ))
     elif isinstance(tree, tuple) and 'hyperion.ast' in str(type(tree)):
         # Namedtuple.
-        tree = type(tree)(*[fold(f, child) for child in tree])
+        tree = type(tree)(*fold_tuple(tree))
 
     return f(tree)
 
@@ -32,10 +34,10 @@ def render(statements):
             return scope + namespace + node.name
 
         def render_tuple():
-            if len(node) == 1:
-                return f'({node[0]},)'
+            if len(node.items) == 1:
+                return f'({node.items[0]},)'
             else:
-                return '(' + ', '.join(map(str, node)) + ')'
+                return '(' + ', '.join(map(str, node.items)) + ')'
 
         def render_call():
             args = ', '.join(
@@ -52,10 +54,16 @@ def render(statements):
             ),
             ast.Identifier: render_identifier,
             ast.Scope: lambda: '/'.join(node.path),
+            ast.BinaryOp: lambda: (
+                f'{node.left} {ast.operator_chars[node.operator]} {node.right}'
+            ),
+            ast.UnaryOp: lambda: (
+                f'{ast.operator_chars[node.operator]} {node.operand}'
+            ),
             ast.Dict: lambda: '{' + ', '.join(
-                f'{k}: {v}' for (k, v) in node.items()
+                f'{k}: {v}' for (k, v) in node.items
             ) + '}',
-            ast.List: lambda: '[' + ', '.join(map(str, node)) + ']',
+            ast.List: lambda: '[' + ', '.join(map(str, node.items)) + ']',
             ast.Tuple: render_tuple,
             ast.Macro: lambda: f'%{node.name}',
             ast.Reference: lambda: f'@{node.identifier}',

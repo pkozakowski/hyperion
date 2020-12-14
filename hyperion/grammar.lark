@@ -8,7 +8,7 @@ binding: identifier "=" expr
 
 identifier: [scope "/"] [namespace "."] name
 scope: (name "/")* name
-name: CNAME
+name: NAME
 
 ?expr: lor_op
 
@@ -37,53 +37,53 @@ tuple: "(" _cs_list{expr}? ")"
 call: "@" identifier "(" cs_list{argument}? ")"
 argument: name "=" expr
 
-?pow_op: atom "**" atom -> pow
+?pow_op: pow_op "**" pow_op -> pow
        | atom
-?unary_op: "+" pow_op -> pos
-         | "-" pow_op -> neg
-         | "~" pow_op -> inv
+?unary_op: "+" unary_op -> pos
+         | "-" unary_op -> neg
+         | "~" unary_op -> inv
          | pow_op
-?mul_op: unary_op "*" unary_op  -> mul
-       | unary_op "/" unary_op  -> truediv
-       | unary_op "//" unary_op -> floordiv
-       | unary_op "%" unary_op  -> mod
+?mul_op: mul_op "*" mul_op  -> mul
+       | mul_op "/" mul_op  -> truediv
+       | mul_op "//" mul_op -> floordiv
+       | mul_op "%" mul_op  -> mod
        | unary_op
-?add_op: mul_op "+" mul_op -> add
-       | mul_op "-" mul_op -> sub
+?add_op: add_op "+" add_op -> add
+       | add_op "-" add_op -> sub
        | mul_op
-?shift_op: add_op "<<" add_op -> lshift
-         | add_op ">>" add_op -> rshift
+?shift_op: shift_op "<<" shift_op -> lshift
+         | shift_op ">>" shift_op -> rshift
          | add_op
-?and_op: shift_op "&" shift_op -> and_
+?and_op: and_op "&" and_op -> and_
        | shift_op
-?xor_op: and_op "^" and_op -> xor
+?xor_op: xor_op "^" xor_op -> xor
        | and_op
-?or_op: xor_op "|" xor_op -> or_
+?or_op: or_op "|" or_op -> or_
       | xor_op
-?cmp_op: or_op "==" or_op       -> eq
-       | or_op "!=" or_op       -> ne
-       | or_op "<>" or_op       -> ne
-       | or_op "<" or_op        -> lt
-       | or_op ">" or_op        -> gt
-       | or_op "<=" or_op       -> le
-       | or_op ">=" or_op       -> ge
-       | or_op "is" or_op       -> is_
-       | or_op "is" "not" or_op -> is_not
-       | or_op "in" or_op       -> in_
-       | or_op "not" "in" or_op -> not_in
+?cmp_op: cmp_op "==" cmp_op       -> eq
+       | cmp_op "!=" cmp_op       -> ne
+       | cmp_op "<>" cmp_op       -> ne
+       | cmp_op "<" cmp_op        -> lt
+       | cmp_op ">" cmp_op        -> gt
+       | cmp_op "<=" cmp_op       -> le
+       | cmp_op ">=" cmp_op       -> ge
+       | cmp_op "is" cmp_op       -> is_
+       | cmp_op "is" "not" cmp_op -> is_not
+       | cmp_op "in" cmp_op       -> in_
+       | cmp_op "not" "in" cmp_op -> not_in
        | or_op
-?not_op: "not" cmp_op -> not_
+?not_op: "not" not_op -> not_
        | cmp_op
-?land_op: not_op "and" not_op -> land
+?land_op: land_op "and" land_op -> land
         | not_op
-?lor_op: land_op "or" land_op -> lor
+?lor_op: lor_op "or" lor_op -> lor
        | land_op
 
-%import common.CNAME
 %import common.SIGNED_NUMBER
+%import common.ESCAPED_STRING -> STRING
 %import common.WS
 %import python.COMMENT
-%import python.STRING
+%import python.NAME
 
 %ignore COMMENT
 %ignore WS

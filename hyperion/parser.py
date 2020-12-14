@@ -22,8 +22,8 @@ def binary_op(operator):
 class GinTransformer(lark.Transformer):
 
     def identifier(self, items):
-        scope = ast.Scope(path=[])
-        namespace = ast.Namespace(path=[])
+        scope = ast.Scope(path=())
+        namespace = ast.Namespace(path=())
         name = None
         for item in items:
             if isinstance(item, ast.Scope):
@@ -46,23 +46,27 @@ class GinTransformer(lark.Transformer):
         except (TypeError, ValueError):
             return float(text)
 
-    start = list
+    @lark.v_args(inline=True)
+    def call(self, identifier, arguments=()):
+        return ast.Call(identifier, tuple(arguments))
+
+    start = tuple
     import_ = ast.Import._make
     binding = ast.Binding._make
-    scope = ast.Scope
-    namespace = ast.Namespace
+    scope = lambda self, path: ast.Scope(tuple(path))
+    namespace = lambda self, path: ast.Namespace(tuple(path))
     entry = tuple
-    cs_list = list
+    argument = tuple
+    cs_list = tuple
+    _cs_list = tuple
 
     macro = ast.Macro._make
     reference = ast.Reference._make
-    call = ast.Call._make
-    argument = tuple
     string = ast.String.from_tokens
 
-    dict = ast.Dict
-    list = ast.List
-    tuple = ast.Tuple
+    dict = lambda self, items: ast.Dict(tuple(items))
+    list = lambda self, items: ast.List(tuple(items))
+    tuple = lambda self, items: ast.Tuple(tuple(items))
 
     none = lambda self, _: None
     true = lambda self, _: True
@@ -103,7 +107,7 @@ with open(grammar_path, 'r') as f:
     grammar = lark.Lark(f.read(), start='start')
 
 
-def parse_bindings(text):
+def parse_config(text):
     parse_tree = grammar.parse(text)
     statements = GinTransformer().transform(parse_tree)
     return statements
