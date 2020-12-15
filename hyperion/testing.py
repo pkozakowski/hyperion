@@ -6,17 +6,25 @@ from hyperion import ast
 from hyperion import parser
 
 
+max_size = 4
+
+
 unary_operators = lambda: st.one_of(*map(st.just, ast.unary_operators))
 binary_operators = lambda: st.one_of(*map(st.just, ast.binary_operators))
 
 
 @st.composite
 def strings(draw):
-    string_st = lark_st.from_lark(parser.grammar, start='STRING')
-    return ast.String.from_quoted(draw(string_st))
+    string_st = st.text(
+        alphabet=st.characters(blacklist_categories=('C', 'Zl', 'Zp')),
+        max_size=max_size,
+    )
+    return ast.String(draw(string_st))
 
 
-names = lambda: lark_st.from_lark(parser.grammar, start='NAME')
+def names():
+    name_st = lark_st.from_lark(parser.grammar, start='NAME')
+    return name_st.filter(lambda x: len(x) <= max_size)
 
 
 @st.composite
@@ -24,9 +32,13 @@ def macros(draw):
     return ast.Macro(name=draw(names()))
 
 
+def internal_lists(item_st, **kwargs):
+    return st.lists(item_st, max_size=max_size, **kwargs)
+
+
 @st.composite
 def scopes(draw):
-    return ast.Scope(path=tuple(draw(st.lists(names()))))
+    return ast.Scope(path=tuple(draw(internal_lists(names()))))
 
 
 @st.composite
@@ -36,7 +48,7 @@ def namespaces(draw, allow_empty):
     else:
         min_size = 1
 
-    path_st = st.lists(names(), min_size=min_size)
+    path_st = internal_lists(names(), min_size=min_size)
     return ast.Namespace(path=tuple(draw(path_st)))
 
 
@@ -57,8 +69,8 @@ def references(draw):
 expr_base = st.one_of(
     st.none(),
     st.booleans(),
-    st.integers(),
-    st.floats(),
+    st.integers(min_value=0),
+    st.floats(min_value=0.0),
     strings(),
     macros(),
     references(),
@@ -67,13 +79,13 @@ expr_base = st.one_of(
 
 @st.composite
 def dicts(draw, expr_st):
-    items_st = st.lists(st.tuples(expr_st, expr_st))
+    items_st = internal_lists(st.tuples(expr_st, expr_st))
     return ast.Dict(items=tuple(draw(items_st)))
 
 
 @st.composite
 def lists(draw, expr_st):
-    items_st = st.lists(expr_st)
+    items_st = internal_lists(expr_st)
     return ast.List(items=tuple(draw(items_st)))
 
 
@@ -140,4 +152,4 @@ statements = lambda: st.one_of(imports(), bindings())
 
 @st.composite
 def configs(draw):
-    return tuple(draw(st.lists(statements())))
+    return tuple(draw(internal_lists(statements())))

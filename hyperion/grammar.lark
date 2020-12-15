@@ -20,7 +20,7 @@ name: NAME
      | "%" name       -> macro
      | "@" identifier -> reference
      | STRING         -> string
-     | SIGNED_NUMBER  -> number
+     | NUMBER         -> number
      | "True"         -> true
      | "False"        -> false
      | "None"         -> none
@@ -79,11 +79,16 @@ argument: name "=" expr
 ?lor_op: lor_op "or" lor_op -> lor
        | land_op
 
-%import common.SIGNED_NUMBER
-%import common.ESCAPED_STRING -> STRING
+STRING: "'" _STRING_ESC_INNER "'"
+      | "\"" _STRING_ESC_INNER "\""
+
+NUMBER: FINITE_NUMBER | "inf" | "nan"
+
+%import common.CNAME -> NAME
+%import common.NUMBER -> FINITE_NUMBER
+%import common._STRING_ESC_INNER
 %import common.WS
 %import python.COMMENT
-%import python.NAME
 
 %ignore COMMENT
 %ignore WS

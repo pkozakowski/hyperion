@@ -43,35 +43,52 @@ class String(str):
         return cls.from_quoted(text)
 
 
-operator_chars = {
-    'pow': '**',
-    'pos': '+',
-    'neg': '-',
-    'inv': '~',
-    'mul': '*',
-    'truediv': '/',
-    'floordiv': '//',
-    'mod': '%',
-    'add': '+',
-    'sub': '-',
-    'lshift': '<<',
-    'rshift': '>>',
-    'and_': '&',
-    'xor': '^',
-    'or_': '|',
-    'eq': '==',
-    'ne': '!=',
-    'lt': '<',
-    'gt': '>',
-    'le': '<=',
-    'ge': '>=',
-    'is_': 'is',
-    'is_not': 'is not',
-    'in_': 'in',
-    'not_in': 'not in',
-    'not_': 'not',
-    'land': 'and',
-    'lor': 'or',
+operator_to_chars_and_precedence = {
+    # Exponentiation:
+    'pow': ('**', 2),
+    # Unary arithmetic and bitwise operators:
+    'pos': ('+', 3),
+    'neg': ('-', 3),
+    'inv': ('~', 3),
+    # Arithmetics:
+    'mul': ('*', 4),
+    'truediv': ('/', 4),
+    'floordiv': ('//', 4),
+    'mod': ('%', 4),
+    'add': ('+', 5),
+    'sub': ('-', 5),
+    # Bitwise operators:
+    'lshift': ('<<', 6),
+    'rshift': ('>>', 6),
+    'and_': ('&', 7),
+    'xor': ('^', 8),
+    'or_': ('|', 9),
+    # Comparisons and membership:
+    'eq': ('==', 10),
+    'ne': ('!=', 10),
+    'lt': ('<', 10),
+    'gt': ('>', 10),
+    'le': ('<=', 10),
+    'ge': ('>=', 10),
+    'is_': ('is', 10),
+    'is_not': ('is not', 10),
+    'in_': ('in', 10),
+    'not_in': ('not in', 10),
+    # Logic:
+    'not_': ('not ', 11),
+    'land': ('and', 12),
+    'lor': ('or', 13),
 }
+all_operators = set(operator_to_chars_and_precedence)
 unary_operators = {'pos', 'neg', 'inv', 'not_'}
-binary_operators = set(operator_chars.keys()) - unary_operators
+binary_operators = all_operators - unary_operators
+
+
+def operator_chars(operator):
+    (chars, _) = operator_to_chars_and_precedence[operator]
+    return chars
+
+
+def operator_precedence(operator):
+    (_, precedence) = operator_to_chars_and_precedence[operator]
+    return precedence
