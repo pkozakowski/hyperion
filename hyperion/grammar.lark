@@ -1,4 +1,4 @@
-start: statement? (statement)*
+start: statement*
 
 ?statement: import_ | binding
 

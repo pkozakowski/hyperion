@@ -101,10 +101,28 @@ class GinTransformer(lark.Transformer):
     land = binary_op('land')
     lor = binary_op('lor')
 
+    def _ambig(self, options):
+        # Ambiguity occurs only for binary operators.
+        assert all(type(option) is ast.BinaryOp for option in options)
+        # Choose the option where an operation of the same precedence as the
+        # root is on the left-hand side.
+        for root in options:
+            if type(root.left) is not ast.BinaryOp:
+                continue
+            root_precedence = ast.operator_precedence(root.operator)
+            left_precedence = ast.operator_precedence(root.left.operator)
+            if root_precedence == left_precedence:
+                return root
+
 
 grammar_path = os.path.join(os.path.dirname(__file__), 'grammar.lark')
 with open(grammar_path, 'r') as f:
-    grammar = lark.Lark(f.read(), start='start')
+    grammar = lark.Lark(
+        f.read(),
+        parser='earley',
+        ambiguity='explicit',
+        start='start',
+    )
 
 
 def parse_config(text):

@@ -1,14 +1,14 @@
 import hypothesis
 from hypothesis import strategies as st
 
-from hyperion import parser
+from hyperion import parsing
+from hyperion import rendering
 from hyperion import testing
-from hyperion import transforms
 
 
 @hypothesis.given(testing.configs())
 def test_parse_inverses_render(original_config):
-    text = transforms.render(original_config)
+    text = rendering.render_config(original_config)
     hypothesis.note(f'Rendered config: {text}')
-    parsed_config = parser.parse_config(text)
+    parsed_config = parsing.parse_config(text)
     assert parsed_config == original_config

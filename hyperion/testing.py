@@ -3,7 +3,7 @@ from hypothesis import strategies as st
 from hypothesis.extra import lark as lark_st
 
 from hyperion import ast
-from hyperion import parser
+from hyperion import parsing
 
 
 max_size = 4
@@ -23,7 +23,7 @@ def strings(draw):
 
 
 def names():
-    name_st = lark_st.from_lark(parser.grammar, start='NAME')
+    name_st = lark_st.from_lark(parsing.grammar, start='NAME')
     return name_st.filter(lambda x: len(x) <= max_size)
 
 
