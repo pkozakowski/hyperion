@@ -10,10 +10,10 @@ def fold(f, tree):
     elif type(tree) in (ast.Tuple, ast.List):
         tree = type(tree)(items=fold_tuple(tree.items))
     elif type(tree) is ast.Dict:
-        tree = ast.Dict(items=tuple(
-            (fold(f, key), fold(f, value)) for (key, value) in tree.items
-        ))
-    elif isinstance(tree, tuple) and 'hyperion.ast' in str(type(tree)):
+        tree = ast.Dict(
+            items=tuple((fold(f, key), fold(f, value)) for (key, value) in tree.items)
+        )
+    elif isinstance(tree, tuple) and "hyperion.ast" in str(type(tree)):
         # Namedtuple.
         tree = type(tree)(*fold_tuple(tree))
 
@@ -32,21 +32,21 @@ def expressions_to_calls(statements):
     def convert_node(node):
         if type(node) is ast.UnaryOp:
             return ast.Call(
-                identifier=make_identifier(['hyperion', 'gin'], '_eval_unary'),
+                identifier=make_identifier(["hyperion", "gin"], "_eval_unary"),
                 arguments=[
-                    ('op', ast.String(node.operator)),
-                    ('v', node.operand),
-                ]
+                    ("op", ast.String(node.operator)),
+                    ("v", node.operand),
+                ],
             )
 
         if type(node) is ast.BinaryOp:
             return ast.Call(
-                identifier=make_identifier(['hyperion', 'gin'], '_eval_binary'),
+                identifier=make_identifier(["hyperion", "gin"], "_eval_binary"),
                 arguments=[
-                    ('l', node.left),
-                    ('op', ast.String(node.operator)),
-                    ('r', node.right),
-                ]
+                    ("l", node.left),
+                    ("op", ast.String(node.operator)),
+                    ("r", node.right),
+                ],
             )
 
         return node
@@ -55,16 +55,12 @@ def expressions_to_calls(statements):
 
 
 def append_scope(scope, identifier):
-    return identifier._replace(
-        scope=ast.Scope(path=(identifier.scope.path + [scope]))
-    )
+    return identifier._replace(scope=ast.Scope(path=(identifier.scope.path + [scope])))
 
 
 def append_name(name, identifier):
     return identifier._replace(
-        namespace=ast.Namespace(
-            path=(identifier.namespace.path + [identifier.name])
-        ),
+        namespace=ast.Namespace(path=(identifier.namespace.path + [identifier.name])),
         name=name,
     )
 
@@ -76,7 +72,7 @@ def calls_to_evaluated_references(statements):
     def convert_node(node):
         if type(node) is ast.Call and node.arguments:
             nonlocal call_index
-            scope = f'_call_{call_index}'
+            scope = f"_call_{call_index}"
             call_index += 1
             new_identifier = append_scope(scope, node.identifier)
             call_with_args = node._replace(identifier=new_identifier)

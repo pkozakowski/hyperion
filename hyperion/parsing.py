@@ -9,6 +9,7 @@ def unary_op(operator):
     @lark.v_args(inline=True)
     def transform(self, operand):
         return ast.UnaryOp(operator, operand)
+
     return transform
 
 
@@ -16,11 +17,11 @@ def binary_op(operator):
     @lark.v_args(inline=True)
     def transform(self, left, right):
         return ast.BinaryOp(left, operator, right)
+
     return transform
 
 
 class GinTransformer(lark.Transformer):
-
     def identifier(self, items):
         scope = ast.Scope(path=())
         namespace = ast.Namespace(path=())
@@ -37,7 +38,7 @@ class GinTransformer(lark.Transformer):
     @lark.v_args(inline=True)
     def name(self, token):
         return token.value
-    
+
     @lark.v_args(inline=True)
     def number(self, token):
         text = token.value
@@ -72,34 +73,34 @@ class GinTransformer(lark.Transformer):
     true = lambda self, _: True
     false = lambda self, _: False
 
-    pow = binary_op('pow')
-    pos = unary_op('pos')
-    neg = unary_op('neg')
-    inv = unary_op('inv')
-    mul = binary_op('mul')
-    truediv = binary_op('truediv')
-    floordiv = binary_op('floordiv')
-    mod = binary_op('mod')
-    add = binary_op('add')
-    sub = binary_op('sub')
-    lshift = binary_op('lshift')
-    rshift = binary_op('rshift')
-    and_ = binary_op('and_')
-    xor = binary_op('xor')
-    or_ = binary_op('or_')
-    eq = binary_op('eq')
-    ne = binary_op('ne')
-    lt = binary_op('lt')
-    gt = binary_op('gt')
-    le = binary_op('le')
-    ge = binary_op('ge')
-    is_ = binary_op('is_')
-    is_not = binary_op('is_not')
-    in_ = binary_op('in_')
-    not_in = binary_op('not_in')
-    not_ = unary_op('not_')
-    land = binary_op('land')
-    lor = binary_op('lor')
+    pow = binary_op("pow")
+    pos = unary_op("pos")
+    neg = unary_op("neg")
+    inv = unary_op("inv")
+    mul = binary_op("mul")
+    truediv = binary_op("truediv")
+    floordiv = binary_op("floordiv")
+    mod = binary_op("mod")
+    add = binary_op("add")
+    sub = binary_op("sub")
+    lshift = binary_op("lshift")
+    rshift = binary_op("rshift")
+    and_ = binary_op("and_")
+    xor = binary_op("xor")
+    or_ = binary_op("or_")
+    eq = binary_op("eq")
+    ne = binary_op("ne")
+    lt = binary_op("lt")
+    gt = binary_op("gt")
+    le = binary_op("le")
+    ge = binary_op("ge")
+    is_ = binary_op("is_")
+    is_not = binary_op("is_not")
+    in_ = binary_op("in_")
+    not_in = binary_op("not_in")
+    not_ = unary_op("not_")
+    land = binary_op("land")
+    lor = binary_op("lor")
 
     def _ambig(self, options):
         # Ambiguity occurs only for binary operators.
@@ -115,13 +116,13 @@ class GinTransformer(lark.Transformer):
                 return root
 
 
-grammar_path = os.path.join(os.path.dirname(__file__), 'grammar.lark')
-with open(grammar_path, 'r') as f:
+grammar_path = os.path.join(os.path.dirname(__file__), "grammar.lark")
+with open(grammar_path, "r") as f:
     grammar = lark.Lark(
         f.read(),
-        parser='earley',
-        ambiguity='explicit',
-        start='start',
+        parser="earley",
+        ambiguity="explicit",
+        start="start",
     )
 
 
@@ -132,5 +133,5 @@ def parse_config(text):
 
 
 def parse_config_file(path):
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         return parse_bindings(f.read())

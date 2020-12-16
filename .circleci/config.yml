@@ -9,8 +9,11 @@ jobs:
     steps:
       - checkout
       - run:
-           command: pip install -e .[dev]
-           name: Install deps
+           command: pip install .[dev]
+           name: Install dependencies
+      - run:
+           command: black --check .
+           name: Check code formatting
       - run:
           command: pytest -vv .
           name: Test

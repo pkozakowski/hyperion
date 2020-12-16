@@ -16,14 +16,14 @@ binary_operators = lambda: st.one_of(*map(st.just, ast.binary_operators))
 @st.composite
 def strings(draw):
     string_st = st.text(
-        alphabet=st.characters(blacklist_categories=('C', 'Zl', 'Zp')),
+        alphabet=st.characters(blacklist_categories=("C", "Zl", "Zp")),
         max_size=max_size,
     )
     return ast.String(draw(string_st))
 
 
 def names():
-    name_st = lark_st.from_lark(parsing.grammar, start='NAME')
+    name_st = lark_st.from_lark(parsing.grammar, start="NAME")
     return name_st.filter(lambda x: len(x) <= max_size)
 
 
