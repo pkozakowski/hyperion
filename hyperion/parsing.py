@@ -5,22 +5,6 @@ import lark
 from hyperion import ast
 
 
-def unary_op(operator):
-    @lark.v_args(inline=True)
-    def transform(self, operand):
-        return ast.UnaryOp(operator, operand)
-
-    return transform
-
-
-def binary_op(operator):
-    @lark.v_args(inline=True)
-    def transform(self, left, right):
-        return ast.BinaryOp(left, operator, right)
-
-    return transform
-
-
 class GinTransformer(lark.Transformer):
     def identifier(self, items):
         scope = ast.Scope(path=())
@@ -73,35 +57,6 @@ class GinTransformer(lark.Transformer):
     true = lambda self, _: True
     false = lambda self, _: False
 
-    pow = binary_op("pow")
-    pos = unary_op("pos")
-    neg = unary_op("neg")
-    inv = unary_op("inv")
-    mul = binary_op("mul")
-    truediv = binary_op("truediv")
-    floordiv = binary_op("floordiv")
-    mod = binary_op("mod")
-    add = binary_op("add")
-    sub = binary_op("sub")
-    lshift = binary_op("lshift")
-    rshift = binary_op("rshift")
-    and_ = binary_op("and_")
-    xor = binary_op("xor")
-    or_ = binary_op("or_")
-    eq = binary_op("eq")
-    ne = binary_op("ne")
-    lt = binary_op("lt")
-    gt = binary_op("gt")
-    le = binary_op("le")
-    ge = binary_op("ge")
-    is_ = binary_op("is_")
-    is_not = binary_op("is_not")
-    in_ = binary_op("in_")
-    not_in = binary_op("not_in")
-    not_ = unary_op("not_")
-    land = binary_op("land")
-    lor = binary_op("lor")
-
     def _ambig(self, options):
         # Ambiguity occurs only for binary operators.
         assert all(type(option) is ast.BinaryOp for option in options)
@@ -114,6 +69,30 @@ class GinTransformer(lark.Transformer):
             left_precedence = ast.operator_precedence(root.left.operator)
             if root_precedence == left_precedence:
                 return root
+
+
+def unary_op(operator):
+    @lark.v_args(inline=True)
+    def transform(self, operand):
+        return ast.UnaryOp(operator, operand)
+
+    return transform
+
+
+for op in ast.unary_operators:
+    setattr(GinTransformer, op, unary_op(op))
+
+
+def binary_op(operator):
+    @lark.v_args(inline=True)
+    def transform(self, left, right):
+        return ast.BinaryOp(left, operator, right)
+
+    return transform
+
+
+for op in ast.binary_operators:
+    setattr(GinTransformer, op, binary_op(op))
 
 
 grammar_path = os.path.join(os.path.dirname(__file__), "grammar.lark")

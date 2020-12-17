@@ -1,3 +1,5 @@
+import functools
+
 import hypothesis
 from hypothesis import strategies as st
 from hypothesis.extra import lark as lark_st
@@ -66,15 +68,20 @@ def references(draw):
     return ast.Reference(identifier=draw(identifiers()))
 
 
-expr_base = st.one_of(
-    st.none(),
-    st.booleans(),
-    st.integers(min_value=0),
-    st.floats(min_value=0.0),
-    strings(),
-    macros(),
-    references(),
-)
+def expr_base(for_eval):
+    base_sts = [
+        st.booleans(),
+        st.integers(min_value=0),
+        st.floats(min_value=0.0, allow_infinity=False, allow_nan=False),
+    ]
+    if not for_eval:
+        base_sts += [
+            st.none(),
+            strings(),
+            macros(),
+            references(),
+        ]
+    return st.one_of(*base_sts)
 
 
 @st.composite
@@ -113,25 +120,44 @@ def unary_ops(draw, expr_st):
 
 
 @st.composite
-def binary_ops(draw, expr_st):
-    return ast.BinaryOp(
-        left=draw(expr_st),
-        operator=draw(binary_operators()),
-        right=draw(expr_st),
+def binary_ops(draw, expr_st, for_eval):
+    ok = False
+    while not ok:
+        ok = True
+        op = ast.BinaryOp(
+            left=draw(expr_st),
+            operator=draw(binary_operators()),
+            right=draw(expr_st),
+        )
+        if for_eval:
+            # Avoid comparison chains - we don't support them yet.
+            if op.operator in ast.comparison_operators:
+                for operand in (op.left, op.right):
+                    if (
+                        type(operand) is ast.BinaryOp
+                        and operand.operator in ast.comparison_operators
+                    ):
+                        ok = False
+            # Make the lazy logical operators strict.
+            if op.operator == "land":
+                op = op._replace(left=True)
+            if op.operator == "lor":
+                op = op._replace(left=False)
+    return op
+
+
+def expr_extend(expr_st, for_eval):
+    extends = [unary_ops, functools.partial(binary_ops, for_eval=for_eval)]
+    if not for_eval:
+        extends += [tuples, lists, calls, dicts]
+    return st.one_of(*(extend(expr_st) for extend in extends))
+
+
+def exprs(for_eval=False):
+    return st.recursive(
+        expr_base(for_eval=for_eval),
+        functools.partial(expr_extend, for_eval=for_eval),
     )
-
-
-expr_extend = lambda expr_st: st.one_of(
-    unary_ops(expr_st),
-    binary_ops(expr_st),
-    tuples(expr_st),
-    lists(expr_st),
-    calls(expr_st),
-    dicts(expr_st),
-)
-
-
-exprs = lambda: st.recursive(expr_base, expr_extend)
 
 
 @st.composite
@@ -153,3 +179,8 @@ statements = lambda: st.one_of(imports(), bindings())
 @st.composite
 def configs(draw):
     return tuple(draw(internal_lists(statements())))
+
+
+def assert_exception_equal(actual, expected):
+    assert type(actual) == type(expected)
+    assert actual.args == expected.args

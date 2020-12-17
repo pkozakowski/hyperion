@@ -59,7 +59,7 @@ operator_to_chars_and_precedence = {
     "and_": ("&", 7),
     "xor": ("^", 8),
     "or_": ("|", 9),
-    # Comparisons and membership:
+    # Comparison and membership:
     "eq": ("==", 10),
     "ne": ("!=", 10),
     "lt": ("<", 10),
@@ -78,6 +78,18 @@ operator_to_chars_and_precedence = {
 all_operators = set(operator_to_chars_and_precedence)
 unary_operators = {"pos", "neg", "inv", "not_"}
 binary_operators = all_operators - unary_operators
+comparison_operators = {
+    "eq",
+    "ne",
+    "lt",
+    "gt",
+    "le",
+    "ge",
+    "is_",
+    "is_not",
+    "in_",
+    "not_in",
+}
 
 
 def operator_chars(operator):

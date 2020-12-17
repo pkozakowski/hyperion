@@ -82,10 +82,8 @@ argument: name "=" expr
 STRING: "'" _STRING_ESC_INNER "'"
       | "\"" _STRING_ESC_INNER "\""
 
-NUMBER: FINITE_NUMBER | "inf" | "nan"
-
 %import common.CNAME -> NAME
-%import common.NUMBER -> FINITE_NUMBER
+%import common.NUMBER
 %import common._STRING_ESC_INNER
 %import common.WS
 %import python.COMMENT

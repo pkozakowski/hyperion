@@ -118,7 +118,9 @@ def render_node(node):
         return (str(node), 0)
 
 
+def render_tree(tree):
+    return transforms.fold(render_node, tree)
+
+
 def render_config(statements):
-    return "\n".join(
-        transforms.fold(render_node, statement) for statement in statements
-    )
+    return "\n".join(map(render_tree, statements))
