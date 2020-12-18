@@ -1,14 +1,20 @@
+import collections
+import contextlib
 import functools
+import importlib
 
+import gin
 import hypothesis
 from hypothesis import strategies as st
 from hypothesis.extra import lark as lark_st
 
 from hyperion import ast
 from hyperion import parsing
+from hyperion import rendering
+from hyperion import transforms
 
 
-max_size = 4
+max_size = 3
 
 
 unary_operators = lambda: st.one_of(*map(st.just, ast.unary_operators))
@@ -173,14 +179,83 @@ def bindings(draw):
     )
 
 
-statements = lambda: st.one_of(imports(), bindings())
+def statements(with_imports):
+    statement_sts = []
+    if with_imports:
+        statement_sts.append(imports())
+    statement_sts.append(bindings())
+    return st.one_of(*statement_sts)
 
 
 @st.composite
-def configs(draw):
-    return tuple(draw(internal_lists(statements())))
+def configs(draw, with_imports=True):
+    return tuple(draw(internal_lists(statements(with_imports=with_imports))))
 
 
 def assert_exception_equal(actual, expected):
     assert type(actual) == type(expected)
     assert actual.args == expected.args
+
+
+@contextlib.contextmanager
+def gin_sandbox():
+    # Reset all bindings, unregister all configurables etc.
+    importlib.reload(gin.config)
+
+    yield gin
+
+    # Clean up after the test.
+    importlib.reload(gin.config)
+
+
+def extract_used_configurables(statements):
+    configurable_to_parameters = collections.defaultdict(set)
+
+    def render_module(path):
+        if path:
+            return ".".join(path)
+        else:
+            return None
+
+    def identifier_module_and_name(identifier):
+        return (render_module(identifier.namespace.path), identifier.name)
+
+    def extract_from_node(node):
+        if type(node) is ast.Binding:
+            path = node.identifier.namespace.path
+            if path:
+                # Regular binding.
+                module_and_name = (render_module(path[:-1]), path[-1])
+                configurable_to_parameters[module_and_name].add(
+                    statement.identifier.name
+                )
+            # Otherwise, it's a macro assignment - no action required.
+
+        if type(node) in (ast.Reference, ast.Call):
+            module_and_name = identifier_module_and_name(node.identifier)
+            # Just add it to the dict.
+            configurable_to_parameters[module_and_name]
+
+        if type(node) is ast.Macro:
+            module_and_name = (None, node.name)
+            # Macros are just configurables with an argument `value`.
+            configurable_to_parameters[module_and_name].add("value")
+
+        return node
+
+    for statement in statements:
+        transforms.fold(extract_from_node, statement)
+
+    return configurable_to_parameters
+
+
+def register_used_configurables(gin, statements):
+    configurable_to_parameters = dict(extract_used_configurables(statements))
+    hypothesis.note(
+        f"Registering configurables with parameters: {configurable_to_parameters}"
+    )
+
+    for ((module, name), parameters) in configurable_to_parameters.items():
+        args = ", ".join(parameters)
+        f = eval(f"lambda {args}: None", {}, {})
+        gin.external_configurable(f, module=module, name=name)
