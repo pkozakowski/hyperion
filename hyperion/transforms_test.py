@@ -6,7 +6,7 @@ from hyperion import testing
 from hyperion import transforms
 
 
-allowed_eval_exceptions = (TypeError, ValueError, ZeroDivisionError)
+allowed_eval_exceptions = {OverflowError, TypeError, ValueError, ZeroDivisionError}
 
 
 @pytest.mark.parametrize(
@@ -39,6 +39,28 @@ def test_partial_idempotence(transform, config):
     except Exception as e:
         if type(e) not in allowed_eval_exceptions:
             raise
+
+
+@hypothesis.given(testing.configs(with_imports=False))
+def test_preprocess_config_produces_gin_parsable_output(config):
+    try:
+        preprocessed_config = transforms.preprocess_config(config)
+    except Exception as e:
+        if type(e) in allowed_eval_exceptions:
+            return
+
+    rendered_config = rendering.render_config(preprocessed_config)
+    hypothesis.note(f"Rendered config: {rendered_config}")
+
+    with testing.gin_sandbox() as gin:
+        testing.register_used_configurables(gin, preprocessed_config)
+
+        try:
+            gin.parse_config(rendered_config)
+        except TypeError as e:
+            # The only exception we allow here, for cases like {[]: ...}.
+            if "unhashable type" not in str(e):
+                raise
 
 
 @pytest.mark.filterwarnings("ignore::SyntaxWarning")
