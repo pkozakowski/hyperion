@@ -67,8 +67,6 @@ argument: name "=" expr
        | cmp_op ">" cmp_op        -> gt
        | cmp_op "<=" cmp_op       -> le
        | cmp_op ">=" cmp_op       -> ge
-       | cmp_op "is" cmp_op       -> is_
-       | cmp_op "is" "not" cmp_op -> is_not
        | cmp_op "in" cmp_op       -> in_
        | cmp_op "not" "in" cmp_op -> not_in
        | or_op

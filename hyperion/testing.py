@@ -2,11 +2,11 @@ import collections
 import contextlib
 import functools
 import importlib
+import string
 
 import gin
 import hypothesis
 from hypothesis import strategies as st
-from hypothesis.extra import lark as lark_st
 
 from hyperion import ast
 from hyperion import parsing
@@ -14,7 +14,7 @@ from hyperion import rendering
 from hyperion import transforms
 
 
-max_size = 2
+max_size = 3
 
 
 unary_operators = lambda: st.one_of(*map(st.just, ast.unary_operators))
@@ -30,9 +30,23 @@ def strings(draw):
     return ast.String(draw(string_st))
 
 
-def names():
-    name_st = lark_st.from_lark(parsing.grammar, start="NAME")
-    return name_st.filter(lambda x: len(x) <= max_size)
+@st.composite
+def names(draw):
+    def chars(char_set):
+        return st.characters(
+            whitelist_categories=(),
+            whitelist_characters=nondigits,
+        )
+
+    nondigits = string.ascii_letters + "_"
+    first = draw(chars(nondigits))
+    rest = draw(
+        st.text(
+            alphabet=chars(nondigits + string.digits),
+            max_size=(max_size - 1),
+        )
+    )
+    return first + rest
 
 
 @st.composite
@@ -113,7 +127,7 @@ def calls(draw, expr_st):
     argument_st = st.tuples(names(), expr_st)
     return ast.Call(
         identifier=draw(identifiers()),
-        arguments=tuple(draw(st.lists(argument_st))),
+        arguments=tuple(draw(internal_lists(argument_st))),
     )
 
 

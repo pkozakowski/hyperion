@@ -66,8 +66,6 @@ operator_to_chars_and_precedence = {
     "gt": (">", 10),
     "le": ("<=", 10),
     "ge": (">=", 10),
-    "is_": ("is", 10),
-    "is_not": ("is not", 10),
     "in_": ("in", 10),
     "not_in": ("not in", 10),
     # Logic:
@@ -85,8 +83,6 @@ comparison_operators = {
     "gt",
     "le",
     "ge",
-    "is_",
-    "is_not",
     "in_",
     "not_in",
 }

@@ -95,7 +95,7 @@ for op in ast.binary_operators:
     setattr(GinTransformer, op, binary_op(op))
 
 
-grammar_path = os.path.join(os.path.dirname(__file__), "grammar.lark")
+grammar_path = os.path.join(os.path.dirname(__file__), "config.lark")
 with open(grammar_path, "r") as f:
     grammar = lark.Lark(
         f.read(),
