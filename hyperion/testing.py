@@ -104,7 +104,7 @@ def lists(draw, expr_st):
 
 @st.composite
 def tuples(draw, expr_st):
-    items_st = st.lists(expr_st)
+    items_st = internal_lists(expr_st)
     return ast.Tuple(items=tuple(draw(items_st)))
 
 

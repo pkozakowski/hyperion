@@ -17,6 +17,7 @@ setup(
             "black",
             "hypothesis",
             "pytest",
+            "pytest-cov",
         ],
     },
 )

@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   python: circleci/python@0.2.1
+  codecov: codecov/codecov@1.0.2
 
 jobs:
   build-and-test:
@@ -15,8 +16,11 @@ jobs:
            command: black --check .
            name: Check code formatting
       - run:
-          command: pytest -vv .
+          command: pytest -vv --cov=hyperion --cov-report=xml .
           name: Test
+      - codecov/upload:
+          file: coverage.xml
+          token: 44f049b5-263b-4070-8b94-30e632f5d8cb
 
 workflows:
   main:
