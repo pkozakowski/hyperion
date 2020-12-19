@@ -192,9 +192,14 @@ def configs(draw, with_imports=True):
     return tuple(draw(internal_lists(statements(with_imports=with_imports))))
 
 
-def assert_exception_equal(actual, expected):
-    assert type(actual) == type(expected)
-    assert actual.args == expected.args
+def assert_exception_equal(actual, expected, from_gin=False):
+    if from_gin:
+        # Gin wraps exceptions in a way that doesn't propagate args nor the
+        # exact type (???).
+        assert type(actual).__name__ == type(expected).__name__
+    else:
+        assert type(actual) == type(expected)
+        assert actual.args == expected.args
 
 
 @contextlib.contextmanager
@@ -259,3 +264,6 @@ def register_used_configurables(gin, statements):
         args = ", ".join(parameters)
         f = eval(f"lambda {args}: None", {}, {})
         gin.external_configurable(f, module=module, name=name)
+
+
+allowed_eval_exceptions = {OverflowError, TypeError, ValueError, ZeroDivisionError}
