@@ -1,23 +1,41 @@
-def unit():
-    return [{}]
+def singleton(name, value):
+    yield {name: value}
 
 
 def all(name, values):
-    return [{name: value} for value in values]
+    for value in values:
+        yield from singleton(name, value)
+
+
+def unit():
+    yield {}
+
+
+def void():
+    return
+    yield
 
 
 def product(*sweeps):
     if not sweeps:
-        return unit()
+        yield from unit()
+        return
 
-    (first, *rest) = *sweeps
-    second = product(*rest)
-    return [
-        dict(**first_hparams, **second_hparams)
-        for first_hparams in first
-        for second_hparams in second
-    ]
+    (first, *rest) = sweeps
+    second = list(product(*rest))
+    for first_hparams in first:
+        for second_hparams in second:
+            all_hparams = first_hparams.copy()
+            all_hparams.update(second_hparams)
+            yield all_hparams
 
 
 def union(*sweeps):
-    return [hparams for sweep in sweeps for hparams in sweep]
+    for sweep in sweeps:
+        yield from sweep
+
+
+def table(names, value_seqs):
+    for value_seq in value_seqs:
+        assert len(value_seq) == len(names)
+        yield dict(zip(names, value_seq))
