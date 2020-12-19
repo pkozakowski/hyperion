@@ -76,19 +76,19 @@ def expressions_to_calls(statements):
     def convert_node(node):
         if type(node) is ast.UnaryOp:
             return ast.Call(
-                identifier=make_identifier(("hyperion", "gin"), "_eval_unary"),
+                identifier=make_identifier(("_h",), "u"),
                 arguments=(
-                    ("op", ast.String(node.operator)),
+                    ("o", ast.String(node.operator)),
                     ("v", node.operand),
                 ),
             )
 
         if type(node) is ast.BinaryOp:
             return ast.Call(
-                identifier=make_identifier(("hyperion", "gin"), "_eval_binary"),
+                identifier=make_identifier(("_h",), "b"),
                 arguments=(
                     ("l", node.left),
-                    ("op", ast.String(node.operator)),
+                    ("o", ast.String(node.operator)),
                     ("r", node.right),
                 ),
             )
@@ -110,13 +110,13 @@ def append_name(name, identifier):
 
 
 def calls_to_evaluated_references(statements):
-    call_index = 1
+    call_index = 0
     calls_with_args = []
 
     def convert_node(node):
         if type(node) is ast.Call and node.arguments:
             nonlocal call_index
-            scope = f"_call_{call_index}"
+            scope = f"_{call_index}"
             call_index += 1
             new_identifier = append_scope(scope, node.identifier)
             call_with_args = node._replace(identifier=new_identifier)
@@ -134,7 +134,8 @@ def calls_to_evaluated_references(statements):
     return statements
 
 
-def preprocess_config(statements):
-    statements = partial_eval(statements)
+def preprocess_config(statements, with_partial_eval=True):
+    if with_partial_eval:
+        statements = partial_eval(statements)
     statements = expressions_to_calls(statements)
     return calls_to_evaluated_references(statements)

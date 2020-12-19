@@ -6,9 +6,6 @@ from hyperion import testing
 from hyperion import transforms
 
 
-allowed_eval_exceptions = {OverflowError, TypeError, ValueError, ZeroDivisionError}
-
-
 @pytest.mark.parametrize(
     "transform",
     (
@@ -37,7 +34,7 @@ def test_partial_idempotence(transform, config):
         transformed_twice = transform(transformed_once)
         assert transformed_once == transformed_twice
     except Exception as e:
-        if type(e) not in allowed_eval_exceptions:
+        if type(e) not in testing.allowed_eval_exceptions:
             raise
 
 
@@ -46,7 +43,7 @@ def test_preprocess_config_produces_gin_parsable_output(config):
     try:
         preprocessed_config = transforms.preprocess_config(config)
     except Exception as e:
-        if type(e) in allowed_eval_exceptions:
+        if type(e) in testing.allowed_eval_exceptions:
             return
 
     rendered_config = rendering.render_config(preprocessed_config)
@@ -72,7 +69,7 @@ def test_partial_eval_equals_python_eval(expr):
     try:
         expected_value = eval(rendered_expr, {}, {})
     except Exception as e:
-        if type(e) in allowed_eval_exceptions:
+        if type(e) in testing.allowed_eval_exceptions:
             expected_exc = e
         else:
             raise
