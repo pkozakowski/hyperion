@@ -14,7 +14,7 @@ from hyperion import rendering
 from hyperion import transforms
 
 
-max_size = 3
+max_size = 2
 
 
 unary_operators = lambda: st.one_of(*map(st.just, ast.unary_operators))
