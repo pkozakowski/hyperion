@@ -109,8 +109,3 @@ def parse_config(text):
     parse_tree = grammar.parse(text)
     statements = GinTransformer().transform(parse_tree)
     return statements
-
-
-def parse_config_file(path):
-    with open(path, "r") as f:
-        return parse_bindings(f.read())
