@@ -62,13 +62,16 @@ class ConfigTransformer(lark.Transformer):
         # Ambiguity occurs only for binary operators.
         assert all(type(option) is ast.BinaryOp for option in options)
         # Choose the option where an operation of the same precedence as the
-        # root is on the left-hand side.
+        # root is on the left-hand side, unless it's exponentiation - then choose the
+        # right-hand side.
         for root in options:
-            if type(root.left) is not ast.BinaryOp:
+            chained = root.right if option.operator == "pow" else root.left
+
+            if type(chained) is not ast.BinaryOp:
                 continue
             root_precedence = ast.operator_precedence(root.operator)
-            left_precedence = ast.operator_precedence(root.left.operator)
-            if root_precedence == left_precedence:
+            chained_precedence = ast.operator_precedence(chained.operator)
+            if root_precedence == chained_precedence:
                 return root
 
 

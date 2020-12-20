@@ -32,3 +32,12 @@ def test_parse_sweep_inverses_render(original_sweep):
     ht.note(f"Rendered sweep: {text}")
     parsed_sweep = parsing.parse_sweep(text)
     assert parsed_sweep == original_sweep
+
+
+@ht.settings(**settings)
+@ht.given(testing.configs())
+def test_configs_are_sweeps(config):
+    text = rendering.render(config)
+    ht.note(f"Rendered config: {text}")
+    parsed_sweep = parsing.parse_sweep(text)
+    assert parsed_sweep.statements == config.statements

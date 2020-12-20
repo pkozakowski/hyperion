@@ -145,3 +145,47 @@ def validate_sweep(sweep):
         return node
 
     fold(validate_node, sweep)
+
+
+def bindings_to_singletons(sweep):
+    def binding_to_singleton(binding):
+        return ast.All(binding.identifier, (binding.expr,))
+
+    def transform_block(block):
+        return type(block)(
+            statements=tuple(
+                binding_to_singleton(statement)
+                if type(statement) is ast.Binding
+                else statement
+                for statement in block.statements
+            )
+        )
+
+    def transform_node(node):
+        if type(node) in (ast.Sweep, ast.Product):
+            return transform_block(node)
+
+        if type(node) is ast.Union:
+            bindings = tuple(
+                statement
+                for statement in node.statements
+                if type(statement) is ast.Binding
+            )
+            if not bindings:
+                return node
+
+            singletons = tuple(map(binding_to_singleton, bindings))
+            non_bindings = tuple(
+                statement for statement in node.statements if statement not in bindings
+            )
+            return ast.Product(statements=(singletons + (ast.Union(non_bindings),)))
+
+        return node
+
+    return fold(transform_node, sweep)
+
+
+def preprocess_sweep(sweep, with_partial_eval=True):
+    validate_sweep(sweep)
+    sweep = preprocess_config(sweep, with_partial_eval)
+    return bindings_to_singletons(sweep)

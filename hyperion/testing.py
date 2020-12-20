@@ -197,11 +197,12 @@ def bindings(draw):
     )
 
 
-def config_statements(with_imports):
+def config_statements(with_imports, with_bindings=True):
     statement_sts = []
     if with_imports:
         statement_sts.append(imports())
-    statement_sts.append(bindings())
+    if with_bindings:
+        statement_sts.append(bindings())
     return st.one_of(*statement_sts)
 
 
@@ -247,27 +248,32 @@ def sweep_statement_extend(statement_st):
     return st.one_of(*(extend(statement_st) for extend in extends))
 
 
-def sweep_statements(with_imports, leaf_sts):
-    leaf_sts = leaf_sts or (
-        config_statements(with_imports=False),
-        alls(),
-        tables(),
-    )
-    return st.one_of(
-        imports(),
+def sweep_statements(leaf_sts, with_imports):
+    statement_sts = []
+    if with_imports:
+        statement_sts.append(imports())
+    statement_sts.append(
         st.recursive(
             st.one_of(*leaf_sts),
             sweep_statement_extend,
             max_leaves=3,
-        ),
+        )
     )
+    return st.one_of(statement_sts)
 
 
 @st.composite
-def sweeps(draw, with_imports=True, leaf_sts=None, allow_empty=True):
+def sweeps(
+    draw, with_imports=True, with_bindings=True, leaf_sts=None, allow_empty=True
+):
+    leaf_sts = leaf_sts or [
+        config_statements(with_imports=False, with_bindings=with_bindings),
+        alls(),
+        tables(),
+    ]
     statements = draw(
         internal_lists(
-            sweep_statements(with_imports=with_imports, leaf_sts=leaf_sts),
+            sweep_statements(leaf_sts, with_imports=with_imports),
             allow_empty=allow_empty,
         )
     )

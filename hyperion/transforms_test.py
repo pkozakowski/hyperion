@@ -7,6 +7,20 @@ from hyperion import testing
 from hyperion import transforms
 
 
+def _test_idempotence(transform, original):
+    transformed_once = transform(original)
+    transformed_twice = transform(transformed_once)
+    assert transformed_once == transformed_twice
+
+
+def _test_partial_idempotence(transform, original):
+    try:
+        _test_idempotence(transform, original)
+    except Exception as e:
+        if type(e) not in testing.allowed_eval_exceptions:
+            raise
+
+
 @pytest.mark.parametrize(
     "transform",
     (
@@ -15,10 +29,8 @@ from hyperion import transforms
     ),
 )
 @hypothesis.given(testing.configs())
-def test_idempotence(transform, config):
-    transformed_once = transform(config)
-    transformed_twice = transform(transformed_once)
-    assert transformed_once == transformed_twice
+def test_config_idempotence(transform, config):
+    _test_idempotence(transform, config)
 
 
 @pytest.mark.parametrize(
@@ -29,14 +41,8 @@ def test_idempotence(transform, config):
     ),
 )
 @hypothesis.given(testing.configs())
-def test_partial_idempotence(transform, config):
-    try:
-        transformed_once = transform(config)
-        transformed_twice = transform(transformed_once)
-        assert transformed_once == transformed_twice
-    except Exception as e:
-        if type(e) not in testing.allowed_eval_exceptions:
-            raise
+def test_config_partial_idempotence(transform, config):
+    _test_partial_idempotence(transform, config)
 
 
 @hypothesis.given(testing.configs(with_imports=False))
@@ -89,6 +95,11 @@ def has_blocks(sweep):
     )
 
 
+@hypothesis.given(testing.sweeps())
+def test_validate_sweep_accepts_when_no_nested_imports(sweep):
+    transforms.validate_sweep(sweep)
+
+
 @hypothesis.given(
     testing.sweeps(leaf_sts=[testing.imports()], allow_empty=False).filter(has_blocks)
 )
@@ -97,6 +108,39 @@ def test_validate_sweep_raises_on_nested_imports(sweep):
         transforms.validate_sweep(sweep)
 
 
+@pytest.mark.parametrize(
+    "transform",
+    (transforms.bindings_to_singletons,),
+)
 @hypothesis.given(testing.sweeps())
-def test_validate_sweep_accepts_without_nested_imports(sweep):
-    transforms.validate_sweep(sweep)
+def test_sweep_idempotence(transform, sweep):
+    _test_idempotence(transform, sweep)
+
+
+@pytest.mark.parametrize(
+    "transform",
+    (
+        transforms.validate_sweep,
+        transforms.preprocess_sweep,
+    ),
+)
+@hypothesis.given(testing.sweeps())
+def test_sweep_partial_idempotence(transform, sweep):
+    _test_partial_idempotence(transform, sweep)
+
+
+@hypothesis.given(testing.sweeps(with_bindings=False))
+def test_bindings_to_singletons_is_identity_without_bindings(sweep):
+    transformed_sweep = transforms.bindings_to_singletons(sweep)
+    assert transformed_sweep == sweep
+
+
+@hypothesis.given(testing.sweeps())
+def test_bindings_to_singletons_removes_bindings(sweep):
+    transformed_sweep = transforms.bindings_to_singletons(sweep)
+
+    def fail_on_binding(node):
+        if type(node) is ast.Binding:
+            pytest.fail()
+
+    transforms.fold(fail_on_binding, transformed_sweep)
