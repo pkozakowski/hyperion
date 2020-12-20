@@ -135,3 +135,13 @@ def preprocess_config(config, with_partial_eval=True):
         config = partial_eval(config)
     config = expressions_to_calls(config)
     return calls_to_evaluated_references(config)
+
+
+def validate_sweep(sweep):
+    def validate_node(node):
+        if type(node) in (ast.Product, ast.Union):
+            if any(type(statement) is ast.Import for statement in node.statements):
+                raise ValueError("Import statement found inside a block.")
+        return node
+
+    fold(validate_node, sweep)

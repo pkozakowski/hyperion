@@ -61,7 +61,9 @@ def macros(draw):
     return ast.Macro(name=draw(names()))
 
 
-def internal_lists(item_st, **kwargs):
+def internal_lists(item_st, allow_empty=True, **kwargs):
+    if not allow_empty:
+        kwargs["min_size"] = 1
     return st.lists(item_st, max_size=max_size, **kwargs)
 
 
@@ -72,12 +74,7 @@ def scopes(draw):
 
 @st.composite
 def namespaces(draw, allow_empty):
-    if allow_empty:
-        min_size = 0
-    else:
-        min_size = 1
-
-    path_st = internal_lists(names(), min_size=min_size)
+    path_st = internal_lists(names(), allow_empty=allow_empty)
     return ast.Namespace(path=tuple(draw(path_st)))
 
 
@@ -85,7 +82,7 @@ def namespaces(draw, allow_empty):
 def identifiers(draw):
     return ast.Identifier(
         scope=draw(scopes()),
-        namespace=draw(namespaces(allow_empty=True)),
+        namespace=draw(namespaces(allow_empty=False)),
         name=draw(names()),
     )
 
@@ -209,7 +206,7 @@ def config_statements(with_imports):
 
 
 @st.composite
-def configs(draw, with_imports=True):
+def configs(draw, with_imports=True, allow_empty=True):
     statements = draw(internal_lists(config_statements(with_imports=with_imports)))
     return ast.Config(statements=tuple(statements))
 
@@ -218,7 +215,7 @@ def configs(draw, with_imports=True):
 def alls(draw):
     return ast.All(
         identifier=draw(identifiers()),
-        exprs=tuple(draw(internal_lists(exprs(), min_size=1))),
+        exprs=tuple(draw(internal_lists(exprs(), allow_empty=False))),
     )
 
 
@@ -250,21 +247,30 @@ def sweep_statement_extend(statement_st):
     return st.one_of(*(extend(statement_st) for extend in extends))
 
 
-def sweep_statements(with_imports):
-    return st.recursive(
-        st.one_of(
-            config_statements(with_imports),
-            alls(),
-            tables(),
+def sweep_statements(with_imports, leaf_sts):
+    leaf_sts = leaf_sts or (
+        config_statements(with_imports=False),
+        alls(),
+        tables(),
+    )
+    return st.one_of(
+        imports(),
+        st.recursive(
+            st.one_of(*leaf_sts),
+            sweep_statement_extend,
+            max_leaves=3,
         ),
-        sweep_statement_extend,
-        max_leaves=3,
     )
 
 
 @st.composite
-def sweeps(draw, with_imports=True):
-    statements = draw(internal_lists(sweep_statements(with_imports=with_imports)))
+def sweeps(draw, with_imports=True, leaf_sts=None, allow_empty=True):
+    statements = draw(
+        internal_lists(
+            sweep_statements(with_imports=with_imports, leaf_sts=leaf_sts),
+            allow_empty=allow_empty,
+        )
+    )
     return ast.Sweep(statements=tuple(statements))
 
 
