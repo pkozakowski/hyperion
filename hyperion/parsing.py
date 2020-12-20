@@ -147,5 +147,6 @@ sweep_grammar = open_grammar("sweep.lark", "sweep")
 
 
 def parse_sweep(text):
+    text += "\n"
     parse_tree = sweep_grammar.parse(text)
     return SweepTransformer().transform(parse_tree)

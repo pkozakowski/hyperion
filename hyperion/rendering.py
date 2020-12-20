@@ -2,6 +2,10 @@ from hyperion import ast
 from hyperion import transforms
 
 
+def render_config_or_sweep(config_or_sweep):
+    return "\n".join(config_or_sweep.statements)
+
+
 def render_identifier(node):
     scope = node.scope
     if scope:
@@ -88,9 +92,34 @@ def render_binary_op(node):
     return (text, precedence)
 
 
+def render_all(node):
+    exprs = extract_exprs(node.exprs)
+    return f"{node.identifier}: [" + ", ".join(map(str, exprs)) + "]"
+
+
+def add_indent(text):
+    indent = "    "
+    return indent + text.replace("\n", "\n" + indent)
+
+
+def render_block(node):
+    name = {ast.Product: "product", ast.Union: "union"}[type(node)]
+    return f"{name}:\n" + "\n".join(map(add_indent, node.statements))
+
+
+def render_table(node):
+    return f"table {node.header}:\n" + "\n".join(map(add_indent, node.rows))
+
+
+def render_row(node):
+    exprs = extract_exprs(node.exprs)
+    return ", ".join(map(str, exprs))
+
+
 def render_node(node):
-    render_table = {
-        ast.Config: lambda node: "\n".join(node.statements),
+    render_map = {
+        # Configs:
+        ast.Config: render_config_or_sweep,
         ast.Import: lambda node: f"import {node.namespace}",
         ast.Namespace: lambda node: ".".join(node.path),
         ast.Binding: render_binding,
@@ -110,10 +139,18 @@ def render_node(node):
         ),
         str: lambda node: node,  # Name.
         tuple: lambda node: node,  # Internal sequence, e.g. namespace path.
+        # Sweeps:
+        ast.Sweep: render_config_or_sweep,
+        ast.All: render_all,
+        ast.Product: render_block,
+        ast.Union: render_block,
+        ast.Table: render_table,
+        ast.Header: lambda node: ", ".join(node.identifiers),
+        ast.Row: render_row,
     }
 
-    if type(node) in render_table:
-        return render_table[type(node)](node)
+    if type(node) in render_map:
+        return render_map[type(node)](node)
     else:
         # Primitive literals - expressions with precedence 0.
         return (str(node), 0)

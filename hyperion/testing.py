@@ -32,21 +32,28 @@ def strings(draw):
 
 @st.composite
 def names(draw):
-    def chars(char_set):
-        return st.characters(
-            whitelist_categories=(),
-            whitelist_characters=nondigits,
-        )
+    keywords = {"import", "in", "not", "and", "or", "product", "union", "table"}
 
-    nondigits = string.ascii_letters + "_"
-    first = draw(chars(nondigits))
-    rest = draw(
-        st.text(
-            alphabet=chars(nondigits + string.digits),
-            max_size=(max_size - 1),
+    name = None
+    while name in keywords or name is None:
+
+        def chars(char_set):
+            return st.characters(
+                whitelist_categories=(),
+                whitelist_characters=nondigits,
+            )
+
+        nondigits = string.ascii_letters + "_"
+        first = draw(chars(nondigits))
+        rest = draw(
+            st.text(
+                alphabet=chars(nondigits + string.digits),
+                max_size=(max_size - 1),
+            )
         )
-    )
-    return first + rest
+        name = first + rest
+
+    return name
 
 
 @st.composite
@@ -193,7 +200,7 @@ def bindings(draw):
     )
 
 
-def statements(with_imports):
+def config_statements(with_imports):
     statement_sts = []
     if with_imports:
         statement_sts.append(imports())
@@ -203,8 +210,62 @@ def statements(with_imports):
 
 @st.composite
 def configs(draw, with_imports=True):
-    statement_list = draw(internal_lists(statements(with_imports=with_imports)))
-    return ast.Config(statements=tuple(statement_list))
+    statements = draw(internal_lists(config_statements(with_imports=with_imports)))
+    return ast.Config(statements=tuple(statements))
+
+
+@st.composite
+def alls(draw):
+    return ast.All(
+        identifier=draw(identifiers()),
+        exprs=tuple(draw(internal_lists(exprs(), min_size=1))),
+    )
+
+
+@st.composite
+def rows(draw):
+    return ast.Row(exprs=tuple(draw(internal_lists(exprs(), min_size=1))))
+
+
+@st.composite
+def tables(draw):
+    identifier_list = draw(internal_lists(identifiers(), min_size=1))
+    return ast.Table(
+        header=ast.Header(identifiers=tuple(identifier_list)),
+        rows=tuple(draw(internal_lists(rows(), min_size=1))),
+    )
+
+
+def make_blocks(block_type):
+    @st.composite
+    def blocks(draw, statement_st):
+        statements = draw(internal_lists(statement_st, min_size=1))
+        return block_type(statements=tuple(statements))
+
+    return blocks
+
+
+def sweep_statement_extend(statement_st):
+    extends = [make_blocks(ast.Product), make_blocks(ast.Union)]
+    return st.one_of(*(extend(statement_st) for extend in extends))
+
+
+def sweep_statements(with_imports):
+    return st.recursive(
+        st.one_of(
+            config_statements(with_imports),
+            alls(),
+            tables(),
+        ),
+        sweep_statement_extend,
+        max_leaves=3,
+    )
+
+
+@st.composite
+def sweeps(draw, with_imports=True):
+    statements = draw(internal_lists(sweep_statements(with_imports=with_imports)))
+    return ast.Sweep(statements=tuple(statements))
 
 
 def assert_exception_equal(actual, expected, from_gin=False):
@@ -246,9 +307,7 @@ def extract_used_configurables(config):
             if path:
                 # Regular binding.
                 module_and_name = (render_module(path[:-1]), path[-1])
-                configurable_to_parameters[module_and_name].add(
-                    node.identifier.name
-                )
+                configurable_to_parameters[module_and_name].add(node.identifier.name)
             # Otherwise, it's a macro assignment - no action required.
 
         if type(node) in (ast.Reference, ast.Call):

@@ -21,14 +21,16 @@ def test_runtime_eval_equals_partial_eval(expr):
     def result(value):
         return value
 
-    config = ast.Config(statements=(
-        ast.Binding(
-            identifier=transforms.make_identifier(
-                namespace_path=("result",), name="value"
+    config = ast.Config(
+        statements=(
+            ast.Binding(
+                identifier=transforms.make_identifier(
+                    namespace_path=("result",), name="value"
+                ),
+                expr=expr,
             ),
-            expr=expr,
-        ),
-    ))
+        )
+    )
     preprocessed_config = transforms.preprocess_config(config, with_partial_eval=False)
     rendered_config = rendering.render(preprocessed_config)
     hypothesis.note(f"Rendered config: {rendered_config}")
