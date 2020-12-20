@@ -46,7 +46,7 @@ def test_preprocess_config_produces_gin_parsable_output(config):
         if type(e) in testing.allowed_eval_exceptions:
             return
 
-    rendered_config = rendering.render_config(preprocessed_config)
+    rendered_config = rendering.render(preprocessed_config)
     hypothesis.note(f"Rendered config: {rendered_config}")
 
     with testing.gin_sandbox() as gin:
@@ -63,7 +63,7 @@ def test_preprocess_config_produces_gin_parsable_output(config):
 @pytest.mark.filterwarnings("ignore::SyntaxWarning")
 @hypothesis.given(testing.exprs(for_eval=True))
 def test_partial_eval_equals_python_eval(expr):
-    (rendered_expr, _) = rendering.render_tree(expr)
+    (rendered_expr, _) = rendering.render(expr)
     hypothesis.note(f"Rendered expr: {rendered_expr}")
     expected_exc = None
     try:
@@ -75,7 +75,7 @@ def test_partial_eval_equals_python_eval(expr):
             raise
 
     try:
-        actual_value = transforms.partial_eval_tree(expr)
+        actual_value = transforms.partial_eval(expr)
     except Exception as actual_exc:
         testing.assert_exception_equal(actual_exc, expected_exc)
     else:

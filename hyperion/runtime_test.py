@@ -11,7 +11,7 @@ from hyperion import transforms
 def test_runtime_eval_equals_partial_eval(expr):
     expected_exc = None
     try:
-        expected_value = transforms.partial_eval_tree(expr)
+        expected_value = transforms.partial_eval(expr)
     except Exception as e:
         if type(e) in testing.allowed_eval_exceptions:
             expected_exc = e
@@ -21,16 +21,16 @@ def test_runtime_eval_equals_partial_eval(expr):
     def result(value):
         return value
 
-    config = [
+    config = ast.Config(statements=(
         ast.Binding(
             identifier=transforms.make_identifier(
                 namespace_path=("result",), name="value"
             ),
             expr=expr,
         ),
-    ]
+    ))
     preprocessed_config = transforms.preprocess_config(config, with_partial_eval=False)
-    rendered_config = rendering.render_config(preprocessed_config)
+    rendered_config = rendering.render(preprocessed_config)
     hypothesis.note(f"Rendered config: {rendered_config}")
     with testing.gin_sandbox() as gin:
         runtime.register(gin)

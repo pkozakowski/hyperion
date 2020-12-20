@@ -90,6 +90,7 @@ def render_binary_op(node):
 
 def render_node(node):
     render_table = {
+        ast.Config: lambda node: "\n".join(node.statements),
         ast.Import: lambda node: f"import {node.namespace}",
         ast.Namespace: lambda node: ".".join(node.path),
         ast.Binding: render_binding,
@@ -118,9 +119,5 @@ def render_node(node):
         return (str(node), 0)
 
 
-def render_tree(tree):
+def render(tree):
     return transforms.fold(render_node, tree)
-
-
-def render_config(statements):
-    return "\n".join(map(render_tree, statements))

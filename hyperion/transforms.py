@@ -38,11 +38,11 @@ def eval_binary_op(left, operator, right):
     return getattr(operator_lib, operator)(left, right)
 
 
-def partial_eval_tree(tree):
+def partial_eval(tree):
     def is_static(value):
         # For now we only support partial evaluation of numerical and logical
         # expressions.
-        return type(value) in (int, float, bool)
+        return type(value) in (int, float, complex, bool)
 
     def eval_node(node):
         if type(node) is ast.UnaryOp and is_static(node.operand):
@@ -60,10 +60,6 @@ def partial_eval_tree(tree):
     return fold(eval_node, tree)
 
 
-def partial_eval(statements):
-    return list(map(partial_eval_tree, statements))
-
-
 def make_identifier(namespace_path, name):
     return ast.Identifier(
         scope=ast.Scope(path=()),
@@ -72,7 +68,7 @@ def make_identifier(namespace_path, name):
     )
 
 
-def expressions_to_calls(statements):
+def expressions_to_calls(tree):
     def convert_node(node):
         if type(node) is ast.UnaryOp:
             return ast.Call(
@@ -95,7 +91,7 @@ def expressions_to_calls(statements):
 
         return node
 
-    return tuple(fold(convert_node, statement) for statement in statements)
+    return fold(convert_node, tree)
 
 
 def append_scope(scope, identifier):
@@ -109,7 +105,7 @@ def append_name(name, identifier):
     )
 
 
-def calls_to_evaluated_references(statements):
+def calls_to_evaluated_references(config):
     call_index = 0
     calls_with_args = []
 
@@ -125,17 +121,17 @@ def calls_to_evaluated_references(statements):
 
         return node
 
-    statements = tuple(fold(convert_node, statement) for statement in statements)
-    statements += tuple(
+    config = fold(convert_node, config)
+    extra_bindings = tuple(
         ast.Binding(append_name(name, identifier), value)
         for (identifier, arguments) in calls_with_args
         for (name, value) in arguments
     )
-    return statements
+    return config._replace(statements=(config.statements + extra_bindings))
 
 
-def preprocess_config(statements, with_partial_eval=True):
+def preprocess_config(config, with_partial_eval=True):
     if with_partial_eval:
-        statements = partial_eval(statements)
-    statements = expressions_to_calls(statements)
-    return calls_to_evaluated_references(statements)
+        config = partial_eval(config)
+    config = expressions_to_calls(config)
+    return calls_to_evaluated_references(config)

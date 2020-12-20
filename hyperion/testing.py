@@ -203,7 +203,8 @@ def statements(with_imports):
 
 @st.composite
 def configs(draw, with_imports=True):
-    return tuple(draw(internal_lists(statements(with_imports=with_imports))))
+    statement_list = draw(internal_lists(statements(with_imports=with_imports)))
+    return ast.Config(statements=tuple(statement_list))
 
 
 def assert_exception_equal(actual, expected, from_gin=False):
@@ -227,7 +228,7 @@ def gin_sandbox():
     importlib.reload(gin.config)
 
 
-def extract_used_configurables(statements):
+def extract_used_configurables(config):
     configurable_to_parameters = collections.defaultdict(set)
 
     def render_module(path):
@@ -246,7 +247,7 @@ def extract_used_configurables(statements):
                 # Regular binding.
                 module_and_name = (render_module(path[:-1]), path[-1])
                 configurable_to_parameters[module_and_name].add(
-                    statement.identifier.name
+                    node.identifier.name
                 )
             # Otherwise, it's a macro assignment - no action required.
 
@@ -262,9 +263,7 @@ def extract_used_configurables(statements):
 
         return node
 
-    for statement in statements:
-        transforms.fold(extract_from_node, statement)
-
+    transforms.fold(extract_from_node, config)
     return configurable_to_parameters
 
 

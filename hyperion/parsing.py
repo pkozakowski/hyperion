@@ -36,7 +36,7 @@ class ConfigTransformer(lark.Transformer):
     def call(self, identifier, arguments=()):
         return ast.Call(identifier, tuple(arguments))
 
-    start = tuple
+    config = lambda self, statements: ast.Config(tuple(statements))
     import_ = ast.Import._make
     binding = ast.Binding._make
     scope = lambda self, path: ast.Scope(tuple(path))
@@ -105,20 +105,20 @@ class BlockIndenter(indenter.Indenter):
     tab_len = 4
 
 
-def open_grammar(name):
+def open_grammar(name, start):
     grammar_path = os.path.dirname(__file__)
     return lark.Lark.open(
         os.path.join(grammar_path, name),
         import_paths=[grammar_path],
+        start=start,
         parser="earley",
         lexer="standard",
         ambiguity="explicit",
-        start="start",
         postlex=BlockIndenter(),
     )
 
 
-config_grammar = open_grammar("config.lark")
+config_grammar = open_grammar("config.lark", "config")
 
 
 def parse_config(text):
@@ -127,6 +127,7 @@ def parse_config(text):
 
 
 class SweepTransformer(lark.Transformer):
+    sweep = lambda self, statements: ast.Sweep(tuple(statements))
     all = ast.All._make
     product = lambda self, statements: ast.Product(tuple(statements))
     union = lambda self, statements: ast.Union(tuple(statements))
@@ -142,7 +143,7 @@ for unprefixed_name in set(dir(ConfigTransformer)) - set(dir(lark.Transformer)):
         setattr(SweepTransformer, name, getattr(ConfigTransformer, unprefixed_name))
 
 
-sweep_grammar = open_grammar("sweep.lark")
+sweep_grammar = open_grammar("sweep.lark", "sweep")
 
 
 def parse_sweep(text):
