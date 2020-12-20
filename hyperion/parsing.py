@@ -1,11 +1,12 @@
 import os
 
 import lark
+from lark import indenter
 
 from hyperion import ast
 
 
-class GinTransformer(lark.Transformer):
+class ConfigTransformer(lark.Transformer):
     def identifier(self, items):
         scope = ast.Scope(path=())
         namespace = ast.Namespace(path=())
@@ -80,7 +81,7 @@ def unary_op(operator):
 
 
 for op in ast.unary_operators:
-    setattr(GinTransformer, op, unary_op(op))
+    setattr(ConfigTransformer, op, unary_op(op))
 
 
 def binary_op(operator):
@@ -92,20 +93,58 @@ def binary_op(operator):
 
 
 for op in ast.binary_operators:
-    setattr(GinTransformer, op, binary_op(op))
+    setattr(ConfigTransformer, op, binary_op(op))
 
 
-grammar_path = os.path.join(os.path.dirname(__file__), "config.lark")
-with open(grammar_path, "r") as f:
-    grammar = lark.Lark(
-        f.read(),
+class BlockIndenter(indenter.Indenter):
+    NL_type = "_NL"
+    OPEN_PAREN_types = ["_LPAREN", "_LBRACKET", "_LBRACE"]
+    CLOSE_PAREN_types = ["_RPAREN", "_RBRACKET", "_RBRACE"]
+    INDENT_type = "_INDENT"
+    DEDENT_type = "_DEDENT"
+    tab_len = 4
+
+
+def open_grammar(name):
+    grammar_path = os.path.dirname(__file__)
+    return lark.Lark.open(
+        os.path.join(grammar_path, name),
+        import_paths=[grammar_path],
         parser="earley",
+        lexer="standard",
         ambiguity="explicit",
         start="start",
+        postlex=BlockIndenter(),
     )
 
 
+config_grammar = open_grammar("config.lark")
+
+
 def parse_config(text):
-    parse_tree = grammar.parse(text)
-    statements = GinTransformer().transform(parse_tree)
-    return statements
+    parse_tree = config_grammar.parse(text)
+    return ConfigTransformer().transform(parse_tree)
+
+
+class SweepTransformer(lark.Transformer):
+    all = ast.All._make
+    product = lambda self, statements: ast.Product(tuple(statements))
+    union = lambda self, statements: ast.Union(tuple(statements))
+    table = lambda self, items: ast.Table(header=items[0], rows=tuple(items[1:]))
+    table_header = lambda self, identifiers: ast.Header(tuple(identifiers))
+    table_row = lambda self, exprs: ast.Row(tuple(exprs))
+
+
+# Copy the ConfigTransformer visitors into SweepTransformer with the config__ prefix.
+# The prefix is added when importing config.lark from sweep.lark.
+for unprefixed_name in set(dir(ConfigTransformer)) - set(dir(lark.Transformer)):
+    for name in (unprefixed_name, "config__" + unprefixed_name):
+        setattr(SweepTransformer, name, getattr(ConfigTransformer, unprefixed_name))
+
+
+sweep_grammar = open_grammar("sweep.lark")
+
+
+def parse_sweep(text):
+    parse_tree = sweep_grammar.parse(text)
+    return SweepTransformer().transform(parse_tree)

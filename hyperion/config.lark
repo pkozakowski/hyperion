@@ -1,4 +1,4 @@
-start: statement*
+start: _NL? (statement _NL)* statement?
 
 ?statement: import_ | binding
 
@@ -16,7 +16,7 @@ name: NAME
      | list
      | tuple
      | call
-     | "(" expr ")"
+     | _LPAREN expr _RPAREN
      | "%" name       -> macro
      | "@" identifier -> reference
      | STRING         -> string
@@ -25,16 +25,16 @@ name: NAME
      | "False"        -> false
      | "None"         -> none
 
-dict: "{" _cs_list{entry}? "}"
+dict: _LBRACE _cs_list{entry}? _RBRACE
 entry: expr ":" expr
 _cs_list{item}: item ("," item)* [","]
 cs_list{item}: _cs_list{item}
 
-list: "[" _cs_list{expr}? "]"
+list: _LBRACKET _cs_list{expr}? _RBRACKET
 
-tuple: "(" _cs_list{expr}? ")"
+tuple: _LPAREN _cs_list{expr}? _RPAREN
 
-call: "@" identifier "(" cs_list{argument}? ")"
+call: "@" identifier _LPAREN cs_list{argument}? _RPAREN
 argument: name "=" expr
 
 ?pow_op: pow_op "**" pow_op -> pow
@@ -80,11 +80,22 @@ argument: name "=" expr
 STRING: "'" _STRING_ESC_INNER "'"
       | "\"" _STRING_ESC_INNER "\""
 
+_LPAREN: "("
+_RPAREN: ")"
+_LBRACKET: "["
+_RBRACKET: "]"
+_LBRACE: "{"
+_RBRACE: "}"
+
+_NL: /(\r?\n[\t ]*)+/
+
+COMMENT: _COMMENT _NL
+
 %import common.CNAME -> NAME
 %import common.NUMBER
 %import common._STRING_ESC_INNER
-%import common.WS
-%import python.COMMENT
+%import common.WS_INLINE
+%import python.COMMENT -> _COMMENT
 
 %ignore COMMENT
-%ignore WS
+%ignore WS_INLINE

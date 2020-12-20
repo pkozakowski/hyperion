@@ -2,6 +2,8 @@ import ast as python_ast
 import collections
 
 
+# Configs:
+
 Import = collections.namedtuple("Import", ["namespace"])
 Namespace = collections.namedtuple("Namespace", ["path"])
 Binding = collections.namedtuple("Binding", ["identifier", "expr"])
@@ -96,3 +98,13 @@ def operator_chars(operator):
 def operator_precedence(operator):
     (_, precedence) = operator_to_chars_and_precedence[operator]
     return precedence
+
+
+# Sweeps:
+
+All = collections.namedtuple("All", ["identifier", "exprs"])
+Product = collections.namedtuple("Product", ["statements"])
+Union = collections.namedtuple("Union", ["statements"])
+Table = collections.namedtuple("Table", ["header", "rows"])
+Header = collections.namedtuple("Header", ["identifiers"])
+Row = collections.namedtuple("Row", ["exprs"])
