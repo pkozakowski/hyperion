@@ -372,4 +372,19 @@ def register_used_configurables(gin, statements):
         gin.external_configurable(f, module=module, name=name)
 
 
+def try_to_parse_config_using_gin(config):
+    rendered_config = rendering.render(config)
+    hypothesis.note(f"Rendered config: {rendered_config}")
+
+    with gin_sandbox() as gin:
+        register_used_configurables(gin, config)
+
+        try:
+            gin.parse_config(rendered_config)
+        except TypeError as e:
+            # The only exception we allow here, for cases like {[]: ...}.
+            if "unhashable type" not in str(e):
+                raise
+
+
 allowed_eval_exceptions = {OverflowError, TypeError, ValueError, ZeroDivisionError}
