@@ -4,6 +4,7 @@ import collections
 
 # Configs:
 
+Config = collections.namedtuple("Config", ["statements"])
 Import = collections.namedtuple("Import", ["namespace"])
 Namespace = collections.namedtuple("Namespace", ["path"])
 Binding = collections.namedtuple("Binding", ["identifier", "expr"])
@@ -102,6 +103,7 @@ def operator_precedence(operator):
 
 # Sweeps:
 
+Sweep = collections.namedtuple("Sweep", ["statements"])
 All = collections.namedtuple("All", ["identifier", "exprs"])
 Product = collections.namedtuple("Product", ["statements"])
 Union = collections.namedtuple("Union", ["statements"])

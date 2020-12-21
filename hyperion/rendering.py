@@ -2,6 +2,10 @@ from hyperion import ast
 from hyperion import transforms
 
 
+def render_config_or_sweep(config_or_sweep):
+    return "\n".join(config_or_sweep.statements)
+
+
 def render_identifier(node):
     scope = node.scope
     if scope:
@@ -79,17 +83,44 @@ def render_binary_op(node):
     operator_chars = ast.operator_chars(node.operator)
     (right_text, right_precedence) = node.right
     precedence = ast.operator_precedence(node.operator)
-    if left_precedence > precedence:
+    chain_left = right_precedence == precedence and node.operator != "pow"
+    chain_right = left_precedence == precedence and node.operator == "pow"
+    if left_precedence > precedence or chain_right:
         left_text = f"({left_text})"
-    # >= because of left-to-right chaining.
-    if right_precedence >= precedence:
+    if right_precedence > precedence or chain_left:
         right_text = f"({right_text})"
     text = f"{left_text} {operator_chars} {right_text}"
     return (text, precedence)
 
 
+def render_all(node):
+    exprs = extract_exprs(node.exprs)
+    return f"{node.identifier}: [" + ", ".join(map(str, exprs)) + "]"
+
+
+def add_indent(text):
+    indent = "    "
+    return indent + text.replace("\n", "\n" + indent)
+
+
+def render_block(node):
+    name = {ast.Product: "product", ast.Union: "union"}[type(node)]
+    return f"{name}:\n" + "\n".join(map(add_indent, node.statements))
+
+
+def render_table(node):
+    return f"table {node.header}:\n" + "\n".join(map(add_indent, node.rows))
+
+
+def render_row(node):
+    exprs = extract_exprs(node.exprs)
+    return ", ".join(map(str, exprs))
+
+
 def render_node(node):
-    render_table = {
+    render_map = {
+        # Configs:
+        ast.Config: render_config_or_sweep,
         ast.Import: lambda node: f"import {node.namespace}",
         ast.Namespace: lambda node: ".".join(node.path),
         ast.Binding: render_binding,
@@ -109,18 +140,22 @@ def render_node(node):
         ),
         str: lambda node: node,  # Name.
         tuple: lambda node: node,  # Internal sequence, e.g. namespace path.
+        # Sweeps:
+        ast.Sweep: render_config_or_sweep,
+        ast.All: render_all,
+        ast.Product: render_block,
+        ast.Union: render_block,
+        ast.Table: render_table,
+        ast.Header: lambda node: ", ".join(node.identifiers),
+        ast.Row: render_row,
     }
 
-    if type(node) in render_table:
-        return render_table[type(node)](node)
+    if type(node) in render_map:
+        return render_map[type(node)](node)
     else:
         # Primitive literals - expressions with precedence 0.
         return (str(node), 0)
 
 
-def render_tree(tree):
+def render(tree):
     return transforms.fold(render_node, tree)
-
-
-def render_config(statements):
-    return "\n".join(map(render_tree, statements))

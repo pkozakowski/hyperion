@@ -32,21 +32,28 @@ def strings(draw):
 
 @st.composite
 def names(draw):
-    def chars(char_set):
-        return st.characters(
-            whitelist_categories=(),
-            whitelist_characters=nondigits,
-        )
+    keywords = {"import", "in", "not", "and", "or", "product", "union", "table"}
 
-    nondigits = string.ascii_letters + "_"
-    first = draw(chars(nondigits))
-    rest = draw(
-        st.text(
-            alphabet=chars(nondigits + string.digits),
-            max_size=(max_size - 1),
+    name = None
+    while name in keywords or name is None:
+
+        def chars(char_set):
+            return st.characters(
+                whitelist_categories=(),
+                whitelist_characters=nondigits,
+            )
+
+        nondigits = string.ascii_letters + "_"
+        first = draw(chars(nondigits))
+        rest = draw(
+            st.text(
+                alphabet=chars(nondigits + string.digits),
+                max_size=(max_size - 1),
+            )
         )
-    )
-    return first + rest
+        name = first + rest
+
+    return name
 
 
 @st.composite
@@ -54,8 +61,12 @@ def macros(draw):
     return ast.Macro(name=draw(names()))
 
 
-def internal_lists(item_st, **kwargs):
-    return st.lists(item_st, max_size=max_size, **kwargs)
+def internal_lists(item_st, allow_empty=True, **kwargs):
+    list_kwargs = {"max_size": max_size}
+    if not allow_empty:
+        list_kwargs["min_size"] = 1
+    list_kwargs.update(kwargs)
+    return st.lists(item_st, **list_kwargs)
 
 
 @st.composite
@@ -65,12 +76,7 @@ def scopes(draw):
 
 @st.composite
 def namespaces(draw, allow_empty):
-    if allow_empty:
-        min_size = 0
-    else:
-        min_size = 1
-
-    path_st = internal_lists(names(), min_size=min_size)
+    path_st = internal_lists(names(), allow_empty=allow_empty)
     return ast.Namespace(path=tuple(draw(path_st)))
 
 
@@ -78,7 +84,7 @@ def namespaces(draw, allow_empty):
 def identifiers(draw):
     return ast.Identifier(
         scope=draw(scopes()),
-        namespace=draw(namespaces(allow_empty=True)),
+        namespace=draw(namespaces(allow_empty=False)),
         name=draw(names()),
     )
 
@@ -193,17 +199,107 @@ def bindings(draw):
     )
 
 
-def statements(with_imports):
+def config_statements(with_imports, with_bindings=True):
     statement_sts = []
     if with_imports:
         statement_sts.append(imports())
-    statement_sts.append(bindings())
+    if with_bindings:
+        statement_sts.append(bindings())
     return st.one_of(*statement_sts)
 
 
 @st.composite
-def configs(draw, with_imports=True):
-    return tuple(draw(internal_lists(statements(with_imports=with_imports))))
+def configs(draw, with_imports=True, allow_empty=True):
+    statements = draw(internal_lists(config_statements(with_imports=with_imports)))
+    return ast.Config(statements=tuple(statements))
+
+
+@st.composite
+def alls(draw):
+    return ast.All(
+        identifier=draw(identifiers()),
+        exprs=tuple(draw(internal_lists(exprs(), allow_empty=False))),
+    )
+
+
+@st.composite
+def rows(draw, size=None, exclude_size=None):
+    if size is not None:
+        expr_seq_st = st.tuples(*[exprs()] * size)
+    else:
+        expr_seq_st = internal_lists(exprs())
+    if exclude_size is not None:
+        expr_seq_st = expr_seq_st.filter(lambda l: len(l) != exclude_size)
+    return ast.Row(exprs=tuple(draw(expr_seq_st)))
+
+
+@st.composite
+def tables(draw, correct=True):
+    identifier_list = draw(internal_lists(identifiers(), min_size=1))
+
+    n_columns = len(identifier_list)
+    if correct:
+        row_kwargs = {"size": n_columns}
+    else:
+        row_kwargs = {}
+
+    table = ast.Table(
+        header=ast.Header(identifiers=tuple(identifier_list)),
+        rows=tuple(draw(internal_lists(rows(**row_kwargs), min_size=1))),
+    )
+    if not correct:
+        row_index = draw(st.integers(min_value=0, max_value=(len(table.rows) - 1)))
+        row = draw(rows(exclude_size=n_columns))
+        table = table._replace(
+            rows=(table.rows[:row_index] + (row,) + table.rows[(row_index + 1) :])
+        )
+    return table
+
+
+def make_blocks(block_type):
+    @st.composite
+    def blocks(draw, statement_st):
+        statements = draw(internal_lists(statement_st, min_size=1))
+        return block_type(statements=tuple(statements))
+
+    return blocks
+
+
+def sweep_statement_extend(statement_st):
+    extends = [make_blocks(ast.Product), make_blocks(ast.Union)]
+    return st.one_of(*(extend(statement_st) for extend in extends))
+
+
+def sweep_statements(leaf_sts, with_imports):
+    statement_sts = []
+    if with_imports:
+        statement_sts.append(imports())
+    statement_sts.append(
+        st.recursive(
+            st.one_of(*leaf_sts),
+            sweep_statement_extend,
+            max_leaves=3,
+        )
+    )
+    return st.one_of(statement_sts)
+
+
+@st.composite
+def sweeps(
+    draw, with_imports=True, with_bindings=True, leaf_sts=None, allow_empty=True
+):
+    leaf_sts = leaf_sts or [
+        config_statements(with_imports=False, with_bindings=with_bindings),
+        alls(),
+        tables(),
+    ]
+    statements = draw(
+        internal_lists(
+            sweep_statements(leaf_sts, with_imports=with_imports),
+            allow_empty=allow_empty,
+        )
+    )
+    return ast.Sweep(statements=tuple(statements))
 
 
 def assert_exception_equal(actual, expected, from_gin=False):
@@ -227,7 +323,7 @@ def gin_sandbox():
     importlib.reload(gin.config)
 
 
-def extract_used_configurables(statements):
+def extract_used_configurables(config):
     configurable_to_parameters = collections.defaultdict(set)
 
     def render_module(path):
@@ -245,9 +341,7 @@ def extract_used_configurables(statements):
             if path:
                 # Regular binding.
                 module_and_name = (render_module(path[:-1]), path[-1])
-                configurable_to_parameters[module_and_name].add(
-                    statement.identifier.name
-                )
+                configurable_to_parameters[module_and_name].add(node.identifier.name)
             # Otherwise, it's a macro assignment - no action required.
 
         if type(node) in (ast.Reference, ast.Call):
@@ -262,9 +356,7 @@ def extract_used_configurables(statements):
 
         return node
 
-    for statement in statements:
-        transforms.fold(extract_from_node, statement)
-
+    transforms.fold(extract_from_node, config)
     return configurable_to_parameters
 
 

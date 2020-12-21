@@ -6,7 +6,9 @@ import hypothesis
 from hypothesis import strategies as st
 import pytest
 
+from hyperion import ast
 from hyperion import sweeps
+from hyperion import testing
 
 
 def st_sweeps(allow_empty=True):
@@ -33,8 +35,8 @@ def test_singleton_equals_all_of_one_value(name, value):
 def test_all_produces_all_values_with_specified_name(name, values):
     sweep = list(sweeps.all(name, values))
     assert len(sweep) == len(values)
-    assert all(list(hparams.keys()) == [name] for hparams in sweep)
-    assert all(set(hparams.values()) <= values for hparams in sweep)
+    assert all(list(config_dict.keys()) == [name] for config_dict in sweep)
+    assert all(set(config_dict.values()) <= values for config_dict in sweep)
 
 
 @pytest.mark.parametrize(
@@ -64,23 +66,23 @@ def test_cardinality(sweep_operator, card_operator, card_identity, sweep_list):
     assert actual_card == expected_card
 
 
-def freeze_hparams(hparams):
-    return tuple(sorted(hparams.items()))
+def freeze_config_dict(config_dict):
+    return tuple(sorted(config_dict.items()))
 
 
 def freeze_sweep(sweep):
-    return set(map(freeze_hparams, sweep))
+    return set(map(freeze_config_dict, sweep))
 
 
 @hypothesis.given(sweep_lists())
 def test_union_completeness(sweep_list):
     frozen_union_sweep = freeze_sweep(sweeps.union(*sweep_list))
     for sweep in sweep_list:
-        for hparams in sweep:
-            assert freeze_hparams(hparams) in frozen_union_sweep
+        for config_dict in sweep:
+            assert freeze_config_dict(config_dict) in frozen_union_sweep
 
 
-def unique_hparam_sets(sweep_list):
+def unique_config_dicts(sweep_list):
     for sweep in sweep_list:
         if len(freeze_sweep(sweep)) != len(sweep):
             return False
@@ -90,7 +92,8 @@ def unique_hparam_sets(sweep_list):
 
 def disjoint_names(sweep_list):
     name_sets = [
-        {name for hparams in sweep for name in hparams.keys()} for sweep in sweep_list
+        {name for config_dict in sweep for name in config_dict.keys()}
+        for sweep in sweep_list
     ]
     names_so_far = set()
     for name_set in name_sets:
@@ -102,7 +105,7 @@ def disjoint_names(sweep_list):
     return True
 
 
-@hypothesis.given(sweep_lists().filter(unique_hparam_sets).filter(disjoint_names))
+@hypothesis.given(sweep_lists().filter(unique_config_dicts).filter(disjoint_names))
 def test_product_uniqueness(sweep_list):
     product_sweep = list(sweeps.product(*sweep_list))
     assert len(product_sweep) == len(freeze_sweep(product_sweep))
@@ -112,13 +115,13 @@ def test_product_uniqueness(sweep_list):
 def test_product_completeness(sweep_list):
     product_sweep = sweeps.product(*sweep_list)
     name_to_values = collections.defaultdict(set)
-    for hparams in product_sweep:
-        for (name, value) in hparams.items():
+    for config_dict in product_sweep:
+        for (name, value) in config_dict.items():
             name_to_values[name].add(value)
 
     for sweep in sweep_list:
-        for hparams in sweep:
-            for (name, value) in hparams.items():
+        for config_dict in sweep:
+            for (name, value) in config_dict.items():
                 assert value in name_to_values[name]
 
 
@@ -134,12 +137,26 @@ def test_single_column_table_equals_all(name, values):
 
 
 @hypothesis.given(st.data(), st.lists(st.integers(), min_size=1))
-def test_table_equals_union_of_rows(data, names):
+def test_table_equals_union_of_products_of_singletons(data, names):
     value_seqs = data.draw(st.lists(st.tuples(*([st.integers()] * len(names)))))
-    table_sweep_list = list(sweeps.table(names, value_seqs))
 
-    union_sweep_list = list(
-        sweeps.union(*[[dict(zip(names, value_seq))] for value_seq in value_seqs])
+    table = sweeps.table(names, value_seqs)
+    union = sweeps.union(
+        *[
+            sweeps.product(
+                *[
+                    sweeps.singleton(name, value)
+                    for (name, value) in zip(names, value_seq)
+                ]
+            )
+            for value_seq in value_seqs
+        ]
     )
 
-    assert table_sweep_list == union_sweep_list
+    assert list(table) == list(union)
+
+
+@hypothesis.given(testing.sweeps(with_imports=False, with_bindings=False))
+def test_generate_config_dicts_generates_dicts_indexed_by_identifier(sweep):
+    for config_dict in sweeps.generate_config_dicts(sweep):
+        assert all(type(key) is ast.Identifier for key in config_dict.keys())

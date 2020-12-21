@@ -1,4 +1,4 @@
-start: _NL? (statement _NL)* statement?
+config: _NL? (statement _NL)* statement?
 
 ?statement: import_ | binding
 

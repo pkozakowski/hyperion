@@ -1,3 +1,7 @@
+from hyperion import ast
+from hyperion import transforms
+
+
 def singleton(name, value):
     yield {name: value}
 
@@ -23,11 +27,11 @@ def product(*sweeps):
 
     (first, *rest) = sweeps
     second = list(product(*rest))
-    for first_hparams in first:
-        for second_hparams in second:
-            all_hparams = first_hparams.copy()
-            all_hparams.update(second_hparams)
-            yield all_hparams
+    for first_config_dict in first:
+        for second_config_dict in second:
+            total_config_dict = first_config_dict.copy()
+            total_config_dict.update(second_config_dict)
+            yield total_config_dict
 
 
 def union(*sweeps):
@@ -39,3 +43,27 @@ def table(names, value_seqs):
     for value_seq in value_seqs:
         assert len(value_seq) == len(names)
         yield dict(zip(names, value_seq))
+
+
+def generate_config_dicts(sweep_tree):
+    def generate_from_node(node):
+        def from_product():
+            return product(*node.statements)
+
+        def from_table():
+            rows = tuple(row.exprs for row in node.rows)
+            return table(node.header.identifiers, rows)
+
+        gen_map = {
+            ast.All: lambda: all(*node),
+            ast.Product: from_product,
+            ast.Union: lambda: union(*node.statements),
+            ast.Table: from_table,
+            ast.Sweep: from_product,
+        }
+        if type(node) in gen_map:
+            return gen_map[type(node)]()
+        else:
+            return node
+
+    return transforms.fold(generate_from_node, sweep_tree)

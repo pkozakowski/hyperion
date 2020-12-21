@@ -1,4 +1,4 @@
-start: _NL? statement* _NL?
+sweep: _NL? statement*
 
 ?statement: config_statement _NL
           | all _NL
@@ -15,7 +15,6 @@ _columns: _cs_list{identifier}
         | _LPAREN _cs_list{identifier} _RPAREN
 
 table_row: _cs_list{expr} _NL
-         | _LPAREN _cs_list{expr} _RPAREN _NL
 
 %import config.statement -> config_statement
 %import config (identifier, expr, _cs_list, cs_list, _NL, COMMENT)
