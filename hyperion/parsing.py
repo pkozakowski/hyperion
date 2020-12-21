@@ -65,7 +65,7 @@ class ConfigTransformer(lark.Transformer):
         # root is on the left-hand side, unless it's exponentiation - then choose the
         # right-hand side.
         for root in options:
-            chained = root.right if option.operator == "pow" else root.left
+            chained = root.right if root.operator == "pow" else root.left
 
             if type(chained) is not ast.BinaryOp:
                 continue

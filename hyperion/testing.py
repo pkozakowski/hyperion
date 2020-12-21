@@ -62,9 +62,11 @@ def macros(draw):
 
 
 def internal_lists(item_st, allow_empty=True, **kwargs):
+    list_kwargs = {"max_size": max_size}
     if not allow_empty:
-        kwargs["min_size"] = 1
-    return st.lists(item_st, max_size=max_size, **kwargs)
+        list_kwargs["min_size"] = 1
+    list_kwargs.update(kwargs)
+    return st.lists(item_st, **list_kwargs)
 
 
 @st.composite
@@ -221,17 +223,37 @@ def alls(draw):
 
 
 @st.composite
-def rows(draw):
-    return ast.Row(exprs=tuple(draw(internal_lists(exprs(), min_size=1))))
+def rows(draw, size=None, exclude_size=None):
+    if size is not None:
+        expr_seq_st = st.tuples(*[exprs()] * size)
+    else:
+        expr_seq_st = internal_lists(exprs())
+    if exclude_size is not None:
+        expr_seq_st = expr_seq_st.filter(lambda l: len(l) != exclude_size)
+    return ast.Row(exprs=tuple(draw(expr_seq_st)))
 
 
 @st.composite
-def tables(draw):
+def tables(draw, correct=True):
     identifier_list = draw(internal_lists(identifiers(), min_size=1))
-    return ast.Table(
+
+    n_columns = len(identifier_list)
+    if correct:
+        row_kwargs = {"size": n_columns}
+    else:
+        row_kwargs = {}
+
+    table = ast.Table(
         header=ast.Header(identifiers=tuple(identifier_list)),
-        rows=tuple(draw(internal_lists(rows(), min_size=1))),
+        rows=tuple(draw(internal_lists(rows(**row_kwargs), min_size=1))),
     )
+    if not correct:
+        row_index = draw(st.integers(min_value=0, max_value=(len(table.rows) - 1)))
+        row = draw(rows(exclude_size=n_columns))
+        table = table._replace(
+            rows=(table.rows[:row_index] + (row,) + table.rows[(row_index + 1) :])
+        )
+    return table
 
 
 def make_blocks(block_type):

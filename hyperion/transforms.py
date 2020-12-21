@@ -142,6 +142,14 @@ def validate_sweep(sweep):
         if type(node) in (ast.Product, ast.Union):
             if any(type(statement) is ast.Import for statement in node.statements):
                 raise ValueError("Import statement found inside a block.")
+
+        if type(node) is ast.Table:
+            n_columns = len(node.header.identifiers)
+            if any(len(row.exprs) != n_columns for row in node.rows):
+                raise ValueError(
+                    "Found a table with an inconsistent number of columns."
+                )
+
         return node
 
     fold(validate_node, sweep)

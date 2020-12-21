@@ -83,10 +83,11 @@ def render_binary_op(node):
     operator_chars = ast.operator_chars(node.operator)
     (right_text, right_precedence) = node.right
     precedence = ast.operator_precedence(node.operator)
-    if left_precedence > precedence:
+    chain_left = right_precedence == precedence and node.operator != "pow"
+    chain_right = left_precedence == precedence and node.operator == "pow"
+    if left_precedence > precedence or chain_right:
         left_text = f"({left_text})"
-    # >= because of left-to-right chaining.
-    if right_precedence >= precedence:
+    if right_precedence > precedence or chain_left:
         right_text = f"({right_text})"
     text = f"{left_text} {operator_chars} {right_text}"
     return (text, precedence)

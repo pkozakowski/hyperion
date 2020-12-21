@@ -89,21 +89,31 @@ def test_partial_eval_equals_python_eval(expr):
         assert not expected_exc and actual_value == expected_value
 
 
+@hypothesis.given(testing.sweeps())
+def test_validate_sweep_accepts_valid_sweeps(sweep):
+    transforms.validate_sweep(sweep)
+
+
 def has_blocks(sweep):
     return any(
         type(statement) in (ast.Product, ast.Union) for statement in sweep.statements
     )
 
 
-@hypothesis.given(testing.sweeps())
-def test_validate_sweep_accepts_when_no_nested_imports(sweep):
-    transforms.validate_sweep(sweep)
-
-
 @hypothesis.given(
     testing.sweeps(leaf_sts=[testing.imports()], allow_empty=False).filter(has_blocks)
 )
 def test_validate_sweep_raises_on_nested_imports(sweep):
+    with pytest.raises(ValueError):
+        transforms.validate_sweep(sweep)
+
+
+@hypothesis.given(
+    testing.sweeps(leaf_sts=[testing.tables(correct=False)], allow_empty=False).filter(
+        has_blocks
+    )
+)
+def test_validate_sweep_raises_on_incorrect_tables(sweep):
     with pytest.raises(ValueError):
         transforms.validate_sweep(sweep)
 
