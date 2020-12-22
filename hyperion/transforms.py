@@ -155,6 +155,16 @@ def validate_sweep(sweep):
     fold(validate_node, sweep)
 
 
+def remove_toplevel_imports(sweep):
+    imports = tuple(
+        statement for statement in sweep.statements if type(statement) is ast.Import
+    )
+    non_imports = tuple(
+        statement for statement in sweep.statements if type(statement) is not ast.Import
+    )
+    return (sweep._replace(statements=non_imports), imports)
+
+
 def bindings_to_singletons(sweep):
     def binding_to_singleton(binding):
         return ast.All(binding.identifier, (binding.expr,))

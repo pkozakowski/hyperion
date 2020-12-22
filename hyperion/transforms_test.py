@@ -52,19 +52,10 @@ def test_preprocess_config_produces_gin_parsable_output(config):
     except Exception as e:
         if type(e) in testing.allowed_eval_exceptions:
             return
+        else:
+            raise
 
-    rendered_config = rendering.render(preprocessed_config)
-    hypothesis.note(f"Rendered config: {rendered_config}")
-
-    with testing.gin_sandbox() as gin:
-        testing.register_used_configurables(gin, preprocessed_config)
-
-        try:
-            gin.parse_config(rendered_config)
-        except TypeError as e:
-            # The only exception we allow here, for cases like {[]: ...}.
-            if "unhashable type" not in str(e):
-                raise
+    testing.try_to_parse_config_using_gin(preprocessed_config)
 
 
 @pytest.mark.filterwarnings("ignore::SyntaxWarning")
@@ -118,9 +109,21 @@ def test_validate_sweep_raises_on_incorrect_tables(sweep):
         transforms.validate_sweep(sweep)
 
 
+@hypothesis.given(testing.sweeps())
+def test_remove_toplevel_imports_removes_toplevel_imports(sweep):
+    (filtered_sweep, imports) = transforms.remove_toplevel_imports(sweep)
+    assert not any(
+        type(statement) is ast.Import for statement in filtered_sweep.statements
+    )
+    assert all(type(statement) is ast.Import for statement in imports)
+
+
 @pytest.mark.parametrize(
     "transform",
-    (transforms.bindings_to_singletons,),
+    (
+        lambda sweep: transforms.remove_toplevel_imports(sweep)[0],
+        transforms.bindings_to_singletons,
+    ),
 )
 @hypothesis.given(testing.sweeps())
 def test_sweep_idempotence(transform, sweep):

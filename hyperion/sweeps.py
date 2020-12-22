@@ -45,7 +45,7 @@ def table(names, value_seqs):
         yield dict(zip(names, value_seq))
 
 
-def generate_config_dicts(sweep_tree):
+def generate_configs(sweep_tree):
     def generate_from_node(node):
         def from_product():
             return product(*node.statements)
@@ -66,4 +66,14 @@ def generate_config_dicts(sweep_tree):
         else:
             return node
 
-    return transforms.fold(generate_from_node, sweep_tree)
+    config_dicts = transforms.fold(generate_from_node, sweep_tree)
+
+    def config_dict_to_config(config_dict):
+        return ast.Config(
+            statements=tuple(
+                ast.Binding(identifier=identifier, expr=expr)
+                for (identifier, expr) in config_dict.items()
+            )
+        )
+
+    return map(config_dict_to_config, config_dicts)

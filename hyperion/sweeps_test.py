@@ -9,6 +9,7 @@ import pytest
 from hyperion import ast
 from hyperion import sweeps
 from hyperion import testing
+from hyperion import transforms
 
 
 def st_sweeps(allow_empty=True):
@@ -157,6 +158,9 @@ def test_table_equals_union_of_products_of_singletons(data, names):
 
 
 @hypothesis.given(testing.sweeps(with_imports=False, with_bindings=False))
-def test_generate_config_dicts_generates_dicts_indexed_by_identifier(sweep):
-    for config_dict in sweeps.generate_config_dicts(sweep):
-        assert all(type(key) is ast.Identifier for key in config_dict.keys())
+def test_generate_configs_produces_gin_parsable_output(sweep):
+    for config in sweeps.generate_configs(sweep):
+        preprocessed_config = transforms.preprocess_config(
+            config, with_partial_eval=False
+        )
+        testing.try_to_parse_config_using_gin(preprocessed_config)
