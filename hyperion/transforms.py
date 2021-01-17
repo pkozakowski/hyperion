@@ -139,10 +139,6 @@ def preprocess_config(config, with_partial_eval=True):
 
 def validate_sweep(sweep):
     def validate_node(node):
-        if type(node) in (ast.Product, ast.Union):
-            if any(type(statement) is ast.Import for statement in node.statements):
-                raise ValueError("Import statement found inside a block.")
-
         if type(node) is ast.Table:
             n_columns = len(node.header.identifiers)
             if any(len(row.exprs) != n_columns for row in node.rows):
@@ -155,14 +151,17 @@ def validate_sweep(sweep):
     fold(validate_node, sweep)
 
 
-def remove_toplevel_imports(sweep):
-    imports = tuple(
-        statement for statement in sweep.statements if type(statement) is ast.Import
+def remove_prelude(sweep):
+    def is_prelude(statement):
+        return type(statement) in (ast.Import, ast.Include)
+
+    prelude = tuple(
+        statement for statement in sweep.statements if is_prelude(statement)
     )
-    non_imports = tuple(
-        statement for statement in sweep.statements if type(statement) is not ast.Import
+    statements = tuple(
+        statement for statement in sweep.statements if not is_prelude(statement)
     )
-    return (sweep._replace(statements=non_imports), imports)
+    return (sweep._replace(statements=statements), prelude)
 
 
 def bindings_to_singletons(sweep):

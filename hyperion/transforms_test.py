@@ -45,7 +45,7 @@ def test_config_partial_idempotence(transform, config):
     _test_partial_idempotence(transform, config)
 
 
-@hypothesis.given(testing.configs(with_imports=False))
+@hypothesis.given(testing.configs(with_imports=False, with_includes=False))
 def test_preprocess_config_produces_gin_parsable_output(config):
     try:
         preprocessed_config = transforms.preprocess_config(config)
@@ -92,14 +92,6 @@ def has_blocks(sweep):
 
 
 @hypothesis.given(
-    testing.sweeps(leaf_sts=[testing.imports()], allow_empty=False).filter(has_blocks)
-)
-def test_validate_sweep_raises_on_nested_imports(sweep):
-    with pytest.raises(ValueError):
-        transforms.validate_sweep(sweep)
-
-
-@hypothesis.given(
     testing.sweeps(leaf_sts=[testing.tables(correct=False)], allow_empty=False).filter(
         has_blocks
     )
@@ -110,18 +102,26 @@ def test_validate_sweep_raises_on_incorrect_tables(sweep):
 
 
 @hypothesis.given(testing.sweeps())
-def test_remove_toplevel_imports_removes_toplevel_imports(sweep):
-    (filtered_sweep, imports) = transforms.remove_toplevel_imports(sweep)
-    assert not any(
-        type(statement) is ast.Import for statement in filtered_sweep.statements
-    )
-    assert all(type(statement) is ast.Import for statement in imports)
+def test_remove_prelude_removes_prelude(sweep):
+    (filtered_sweep, prelude) = transforms.remove_prelude(sweep)
+
+    def is_prelude(statement):
+        return type(statement) in (ast.Import, ast.Include)
+
+    assert not any(map(is_prelude, filtered_sweep.statements))
+    assert all(map(is_prelude, prelude))
+
+
+@hypothesis.given(testing.sweeps())
+def test_remove_prelude_preserves_the_number_of_statements(sweep):
+    (filtered_sweep, prelude) = transforms.remove_prelude(sweep)
+    assert len(filtered_sweep.statements) + len(prelude) == len(sweep.statements)
 
 
 @pytest.mark.parametrize(
     "transform",
     (
-        lambda sweep: transforms.remove_toplevel_imports(sweep)[0],
+        lambda sweep: transforms.remove_prelude(sweep)[0],
         transforms.bindings_to_singletons,
     ),
 )
@@ -140,12 +140,6 @@ def test_sweep_idempotence(transform, sweep):
 @hypothesis.given(testing.sweeps())
 def test_sweep_partial_idempotence(transform, sweep):
     _test_partial_idempotence(transform, sweep)
-
-
-@hypothesis.given(testing.sweeps(with_bindings=False))
-def test_bindings_to_singletons_is_identity_without_bindings(sweep):
-    transformed_sweep = transforms.bindings_to_singletons(sweep)
-    assert transformed_sweep == sweep
 
 
 @hypothesis.given(testing.sweeps())

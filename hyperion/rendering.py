@@ -122,6 +122,7 @@ def render_node(node):
         # Configs:
         ast.Config: render_config_or_sweep,
         ast.Import: lambda node: f"import {node.namespace}",
+        ast.Include: lambda node: f"include {extract_expr(node.path)}",
         ast.Namespace: lambda node: ".".join(node.path),
         ast.Binding: render_binding,
         ast.Identifier: render_identifier,

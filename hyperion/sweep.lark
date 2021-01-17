@@ -1,6 +1,6 @@
-sweep: _NL? statement*
+sweep: _NL? _nls_list{prelude_statement}? statement*
 
-?statement: config_statement _NL
+?statement: binding _NL
           | all _NL
           | _block{"product",statement}    -> product
           | _block{"union",statement}      -> union
@@ -16,7 +16,7 @@ _columns: _cs_list{identifier}
 
 table_row: _cs_list{expr} _NL
 
-%import config.statement -> config_statement
+%import config (prelude_statement, binding, _nls_list)
 %import config (identifier, expr, _cs_list, cs_list, _NL, COMMENT)
 %import config (_LPAREN, _RPAREN, _LBRACKET, _RBRACKET, _LBRACE, _RBRACE)
 

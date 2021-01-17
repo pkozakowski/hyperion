@@ -1,10 +1,14 @@
-config: _NL? (statement _NL)* statement?
+config: _NL? _nls_list{prelude_statement}? _nls_list{binding}?
 
-?statement: import_ | binding
+_nls_list{item}: item (_NL item)* _NL?
+
+?prelude_statement: import_ | include
 
 import_: "import" namespace
 namespace: (name ".")* name
 binding: identifier "=" expr
+
+include: "include" STRING
 
 identifier: [scope "/"] [namespace "."] name
 scope: (name "/")* name

@@ -192,6 +192,11 @@ def imports(draw):
 
 
 @st.composite
+def includes(draw):
+    return ast.Include(path=draw(strings()))
+
+
+@st.composite
 def bindings(draw):
     return ast.Binding(
         identifier=draw(identifiers()),
@@ -199,19 +204,24 @@ def bindings(draw):
     )
 
 
-def config_statements(with_imports, with_bindings=True):
+def prelude_statements(with_imports, with_includes):
     statement_sts = []
     if with_imports:
         statement_sts.append(imports())
-    if with_bindings:
-        statement_sts.append(bindings())
+    if with_includes:
+        statement_sts.append(includes())
     return st.one_of(*statement_sts)
 
 
 @st.composite
-def configs(draw, with_imports=True, allow_empty=True):
-    statements = draw(internal_lists(config_statements(with_imports=with_imports)))
-    return ast.Config(statements=tuple(statements))
+def configs(draw, with_imports=True, with_includes=True):
+    if with_imports or with_includes:
+        prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
+    else:
+        prelude = ()
+
+    bds = draw(internal_lists(bindings()))
+    return ast.Config(statements=(tuple(prelude) + tuple(bds)))
 
 
 @st.composite
@@ -271,35 +281,45 @@ def sweep_statement_extend(statement_st):
 
 
 def sweep_statements(leaf_sts, with_imports):
-    statement_sts = []
-    if with_imports:
-        statement_sts.append(imports())
-    statement_sts.append(
-        st.recursive(
-            st.one_of(*leaf_sts),
-            sweep_statement_extend,
-            max_leaves=3,
-        )
+    return st.recursive(
+        st.one_of(*leaf_sts),
+        sweep_statement_extend,
+        max_leaves=2,
     )
-    return st.one_of(statement_sts)
+
+
+@st.composite
+def configs(draw, with_imports=True, with_includes=True):
+    if with_imports or with_includes:
+        prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
+    else:
+        prelude = ()
+
+    bds = draw(internal_lists(bindings()))
+    return ast.Config(statements=(tuple(prelude) + tuple(bds)))
 
 
 @st.composite
 def sweeps(
-    draw, with_imports=True, with_bindings=True, leaf_sts=None, allow_empty=True
+    draw,
+    with_imports=True,
+    with_includes=True,
+    leaf_sts=None,
+    allow_empty=True,
 ):
-    leaf_sts = leaf_sts or [
-        config_statements(with_imports=False, with_bindings=with_bindings),
-        alls(),
-        tables(),
-    ]
+    if with_imports or with_includes:
+        prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
+    else:
+        prelude = ()
+
+    leaf_sts = leaf_sts or [bindings(), alls(), tables()]
     statements = draw(
         internal_lists(
             sweep_statements(leaf_sts, with_imports=with_imports),
             allow_empty=allow_empty,
         )
     )
-    return ast.Sweep(statements=tuple(statements))
+    return ast.Sweep(statements=(tuple(prelude) + tuple(statements)))
 
 
 def assert_exception_equal(actual, expected, from_gin=False):

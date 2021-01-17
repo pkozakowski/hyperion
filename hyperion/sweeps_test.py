@@ -157,10 +157,8 @@ def test_table_equals_union_of_products_of_singletons(data, names):
     assert list(table) == list(union)
 
 
-@hypothesis.given(testing.sweeps(with_imports=False, with_bindings=False))
+@hypothesis.given(testing.sweeps(with_imports=False, with_includes=False))
 def test_generate_configs_produces_gin_parsable_output(sweep):
-    for config in sweeps.generate_configs(sweep):
-        preprocessed_config = transforms.preprocess_config(
-            config, with_partial_eval=False
-        )
-        testing.try_to_parse_config_using_gin(preprocessed_config)
+    preprocessed_sweep = transforms.preprocess_sweep(sweep, with_partial_eval=False)
+    for config in sweeps.generate_configs(preprocessed_sweep):
+        testing.try_to_parse_config_using_gin(config)

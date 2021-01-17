@@ -6,6 +6,7 @@ import collections
 
 Config = collections.namedtuple("Config", ["statements"])
 Import = collections.namedtuple("Import", ["namespace"])
+Include = collections.namedtuple("Include", ["path"])
 Namespace = collections.namedtuple("Namespace", ["path"])
 Binding = collections.namedtuple("Binding", ["identifier", "expr"])
 Identifier = collections.namedtuple("Identifier", ["scope", "namespace", "name"])
