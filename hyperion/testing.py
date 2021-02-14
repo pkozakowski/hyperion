@@ -355,24 +355,37 @@ def extract_used_configurables(config):
     def identifier_module_and_name(identifier):
         return (render_module(identifier.namespace.path), identifier.name)
 
-    def extract_from_node(node):
-        if type(node) is ast.Binding:
-            path = node.identifier.namespace.path
-            if path:
-                # Regular binding.
-                module_and_name = (render_module(path[:-1]), path[-1])
-                configurable_to_parameters[module_and_name].add(node.identifier.name)
-            # Otherwise, it's a macro assignment - no action required.
+    def extract_from_binding_identifier(identifier):
+        path = identifier.namespace.path
+        if path:
+            # Regular binding.
+            module_and_name = (render_module(path[:-1]), path[-1])
+            configurable_to_parameters[module_and_name].add(identifier.name)
+        # Otherwise, it's a macro assignment - no action required.
 
-        if type(node) in (ast.Reference, ast.Call):
+    def extract_from_node(node):
+        if type(node) in (ast.Binding, ast.All):
+            extract_from_binding_identifier(node.identifier)
+
+        if type(node) is ast.Reference:
             module_and_name = identifier_module_and_name(node.identifier)
             # Just add it to the dict.
             configurable_to_parameters[module_and_name]
+
+        if type(node) is ast.Call:
+            module_and_name = identifier_module_and_name(node.identifier)
+            configurable_to_parameters[module_and_name] |= set(
+                name for (name, _) in node.arguments
+            )
 
         if type(node) is ast.Macro:
             module_and_name = (None, node.name)
             # Macros are just configurables with an argument `value`.
             configurable_to_parameters[module_and_name].add("value")
+
+        if type(node) is ast.Header:
+            for identifier in node.identifiers:
+                extract_from_binding_identifier(identifier)
 
         return node
 
@@ -380,8 +393,8 @@ def extract_used_configurables(config):
     return configurable_to_parameters
 
 
-def register_used_configurables(gin, statements):
-    configurable_to_parameters = dict(extract_used_configurables(statements))
+def register_used_configurables(gin, config):
+    configurable_to_parameters = dict(extract_used_configurables(config))
     hypothesis.note(
         f"Registering configurables with parameters: {configurable_to_parameters}"
     )
@@ -392,19 +405,34 @@ def register_used_configurables(gin, statements):
         gin.external_configurable(f, module=module, name=name)
 
 
-def try_to_parse_config_using_gin(config):
-    rendered_config = rendering.render(config)
-    hypothesis.note(f"Rendered config: {rendered_config}")
-
+@contextlib.contextmanager
+def try_in_gin_sandbox(config):
     with gin_sandbox() as gin:
         register_used_configurables(gin, config)
 
         try:
-            gin.parse_config(rendered_config)
+            yield gin
         except TypeError as e:
             # The only exception we allow here, for cases like {[]: ...}.
             if "unhashable type" not in str(e):
                 raise
 
 
+def try_to_parse_config_using_gin(config):
+    rendered_config = rendering.render(config)
+    hypothesis.note(f"Rendered config: {rendered_config}")
+
+    with try_in_gin_sandbox(config) as gin:
+        gin.parse_config(rendered_config)
+
+
 allowed_eval_exceptions = {OverflowError, TypeError, ValueError, ZeroDivisionError}
+
+
+@contextlib.contextmanager
+def try_with_eval():
+    try:
+        yield
+    except Exception as e:
+        if type(e) not in allowed_eval_exceptions:
+            raise
