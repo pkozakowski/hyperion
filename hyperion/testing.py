@@ -408,7 +408,8 @@ def register_used_configurables(gin, config):
 @contextlib.contextmanager
 def try_in_gin_sandbox(config):
     with gin_sandbox() as gin:
-        register_used_configurables(gin, config)
+        if config is not None:
+            register_used_configurables(gin, config)
 
         try:
             yield gin

@@ -123,10 +123,16 @@ def open_grammar(name, start):
 
 
 config_grammar = open_grammar("config.lark", "config")
+expr_grammar = open_grammar("config.lark", "expr")
 
 
 def parse_config(text):
     parse_tree = config_grammar.parse(text)
+    return ConfigTransformer().transform(parse_tree)
+
+
+def parse_expr(text):
+    parse_tree = expr_grammar.parse(text)
     return ConfigTransformer().transform(parse_tree)
 
 

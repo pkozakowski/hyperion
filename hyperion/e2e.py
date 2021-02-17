@@ -1,8 +1,7 @@
 import io
 import os
 
-import gin
-from gin import config as gin_config
+import gin as gin_module
 
 from hyperion import parsing
 from hyperion import rendering
@@ -31,12 +30,15 @@ def _hyperion_to_gin_open(path):
 
 
 def register(gin):
+    global gin_module
+    gin_module = gin
+
     # Override the default file reader with our own. We need to access a private
     # member of the module, because Gin API doesn't allow this.
-    gin.config._FILE_READERS = [(_hyperion_to_gin_open, os.path.isfile)]
+    gin_module.config._FILE_READERS = [(_hyperion_to_gin_open, os.path.isfile)]
 
 
-register(gin)
+register(gin_module)
 
 
 # Implementation of the Gin API:
@@ -45,11 +47,12 @@ register(gin)
 
 def parse_config(bindings, skip_unknown=False):
     gin_bindings = _hyperion_to_gin(bindings)
-    return gin.parse_config(gin_bindings, skip_unknown=skip_unknown)
+    return gin_module.parse_config(gin_bindings, skip_unknown=skip_unknown)
 
 
-# With the default file reader overridden, we can use gin.parse_config_file.
-parse_config_file = gin.parse_config_file
+# With the default file reader overridden, we can use gin_module.parse_config_file.
+def parse_config_file(config_file):
+    return gin_module.parse_config_file()
 
 
 def parse_config_files_and_bindings(
@@ -63,9 +66,9 @@ def parse_config_files_and_bindings(
         bindings = ""
 
     gin_bindings = _hyperion_to_gin(bindings)
-    return gin.parse_config_files_and_bindings(
+    return gin_module.parse_config_files_and_bindings(
         config_files=config_files,
-        bindings=bindings,
+        bindings=gin_bindings,
         finalize_config=finalize_config,
         skip_unknown=skip_unknown,
         print_includes_and_imports=print_includes_and_imports,
@@ -73,8 +76,12 @@ def parse_config_files_and_bindings(
 
 
 def parse_value(value):
-    gin_value = _hyperion_to_gin(value, is_config=False)
-    return gin.parse_value(gin_value)
+    f = gin_module.external_configurable(lambda x: x, name='_f')
+    binding = f'_f.x = {value}'
+    gin_binding = _hyperion_to_gin(binding, is_config=True)
+    with gin_module.unlock_config():
+        gin_module.parse_config(gin_binding)
+    return f()
 
 
 # Implementation of the Hyperion sweep API:
