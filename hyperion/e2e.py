@@ -76,8 +76,8 @@ def parse_config_files_and_bindings(
 
 
 def parse_value(value):
-    f = gin_module.external_configurable(lambda x: x, name='_f')
-    binding = f'_f.x = {value}'
+    f = gin_module.external_configurable(lambda x: x, name="_f")
+    binding = f"_f.x = {value}"
     gin_binding = _hyperion_to_gin(binding, is_config=True)
     with gin_module.unlock_config():
         gin_module.parse_config(gin_binding)

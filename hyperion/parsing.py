@@ -38,7 +38,7 @@ class ConfigTransformer(lark.Transformer):
 
     config = lambda self, statements: ast.Config(tuple(statements))
     import_ = ast.Import._make
-    include = lambda self, tokens: ast.Include(path=str(ast.String.from_tokens(tokens)))
+    include = lambda self, tokens: ast.Include(path=ast.String.from_tokens(tokens))
     binding = ast.Binding._make
     scope = lambda self, path: ast.Scope(tuple(path))
     namespace = lambda self, path: ast.Namespace(tuple(path))

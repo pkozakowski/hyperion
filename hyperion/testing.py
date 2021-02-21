@@ -3,6 +3,7 @@ import contextlib
 import functools
 import importlib
 import string
+import tempfile
 
 import gin
 import hypothesis
@@ -75,16 +76,17 @@ def scopes(draw):
 
 
 @st.composite
-def namespaces(draw, allow_empty):
-    path_st = internal_lists(names(), allow_empty=allow_empty)
+def namespaces(draw, min_size):
+    path_st = internal_lists(names(), min_size=min_size)
     return ast.Namespace(path=tuple(draw(path_st)))
 
 
 @st.composite
-def identifiers(draw):
+def identifiers(draw, with_module=False):
+    min_size = 2 if with_module else 1
     return ast.Identifier(
         scope=draw(scopes()),
-        namespace=draw(namespaces(allow_empty=False)),
+        namespace=draw(namespaces(min_size=min_size)),
         name=draw(names()),
     )
 
@@ -188,7 +190,7 @@ def exprs(for_eval=False):
 
 @st.composite
 def imports(draw):
-    return ast.Import(namespace=draw(namespaces(allow_empty=False)))
+    return ast.Import(namespace=draw(namespaces(min_size=1)))
 
 
 @st.composite
@@ -199,7 +201,7 @@ def includes(draw):
 @st.composite
 def bindings(draw):
     return ast.Binding(
-        identifier=draw(identifiers()),
+        identifier=draw(identifiers(with_module=True)),
         expr=draw(exprs()),
     )
 
@@ -227,7 +229,7 @@ def configs(draw, with_imports=True, with_includes=True):
 @st.composite
 def alls(draw):
     return ast.All(
-        identifier=draw(identifiers()),
+        identifier=draw(identifiers(with_module=True)),
         exprs=tuple(draw(internal_lists(exprs(), allow_empty=False))),
     )
 
@@ -393,23 +395,39 @@ def extract_used_configurables(config):
     return configurable_to_parameters
 
 
-def register_used_configurables(gin, config):
+def save_used_configurables_as_module(config, path):
     configurable_to_parameters = dict(extract_used_configurables(config))
-    hypothesis.note(
-        f"Registering configurables with parameters: {configurable_to_parameters}"
-    )
 
-    for ((module, name), parameters) in configurable_to_parameters.items():
-        args = ", ".join(parameters)
-        f = eval(f"lambda {args}: None", {}, {})
-        gin.external_configurable(f, module=module, name=name)
+    with open(path, "w") as f:
+        f.write("import gin\n")
+        for ((module, name), parameters) in configurable_to_parameters.items():
+            if module == "_h" and name in ("u", "b"):
+                continue
+
+            args = ", ".join(parameters)
+            f.write(f"def {name}({args}):\n")
+            f.write("    pass\n")
+            f.write(f"{name} = gin.external_configurable({name}")
+            if module is not None:
+                f.write(f', module="{module}"')
+            f.write(")\n")
+
+    with open(path, "r") as f:
+        hypothesis.note("Module with configurables: " + path + "\n" + f.read())
+
+
+def register_used_configurables(config):
+    path = tempfile.NamedTemporaryFile().name
+    save_used_configurables_as_module(config, path)
+    with open(path, "r") as f:
+        exec(f.read(), {}, {})
 
 
 @contextlib.contextmanager
-def try_in_gin_sandbox(config):
+def try_in_gin_sandbox(config=None):
     with gin_sandbox() as gin:
         if config is not None:
-            register_used_configurables(gin, config)
+            register_used_configurables(config)
 
         try:
             yield gin

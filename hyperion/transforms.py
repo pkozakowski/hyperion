@@ -72,7 +72,7 @@ def expressions_to_calls(tree):
     def convert_node(node):
         if type(node) is ast.UnaryOp:
             return ast.Call(
-                identifier=make_identifier(("_h",), "u"),
+                identifier=make_identifier(("_h",), "_u"),
                 arguments=(
                     ("o", ast.String(node.operator)),
                     ("v", node.operand),
@@ -81,7 +81,7 @@ def expressions_to_calls(tree):
 
         if type(node) is ast.BinaryOp:
             return ast.Call(
-                identifier=make_identifier(("_h",), "b"),
+                identifier=make_identifier(("_h",), "_b"),
                 arguments=(
                     ("l", node.left),
                     ("o", ast.String(node.operator)),
