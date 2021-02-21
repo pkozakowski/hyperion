@@ -13,6 +13,7 @@ from hyperion import ast
 from hyperion import e2e
 from hyperion import rendering
 from hyperion import runtime
+from hyperion import sweeps
 from hyperion import testing
 from hyperion import transforms
 
@@ -149,8 +150,6 @@ def _python_path(path):
 # - that bindings get correct values (just static); 2 variants:
 #   - standalone
 #   - with an include and an import (as before)
-# - parse_sweep*_produces_different_configs
-#   - assert len(set(rendered_configs)) == len(set(preprocessed_configs))
 
 
 @ht.settings(**settings)
@@ -183,6 +182,18 @@ def test_parse_sweep_succeeds_with_prelude(tmpdir_factory, sweep):
     rendered_sweep = rendering.render(sweep)
     with _python_path(tmpdir):
         _try_to_parse_sweep_configs(e2e.parse_sweep(rendered_sweep))
+
+
+@ht.settings(**settings)
+@ht.given(sweeps_without_prelude)
+def test_parse_sweep_produces_different_configs(sweep):
+    preprocessed_sweep = transforms.bindings_to_singletons(sweep)
+    configs = set(sweeps.generate_configs(preprocessed_sweep))
+
+    rendered_sweep = rendering.render(sweep)
+    rendered_configs = set(e2e.parse_sweep(rendered_sweep))
+
+    assert len(rendered_configs) == len(configs)
 
 
 @ht.settings(**settings)
