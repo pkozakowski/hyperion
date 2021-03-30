@@ -77,16 +77,8 @@ def test_validate_sweep_accepts_valid_sweeps(sweep):
     transforms.validate_sweep(sweep)
 
 
-def has_blocks(sweep):
-    return any(
-        type(statement) in (ast.Product, ast.Union) for statement in sweep.statements
-    )
-
-
 @hypothesis.given(
-    testing.sweeps(leaf_sts=[testing.tables(correct=False)], allow_empty=False).filter(
-        has_blocks
-    )
+    testing.sweeps(leaf_sts=[testing.tables(correct=False)], force_block=True)
 )
 def test_validate_sweep_raises_on_incorrect_tables(sweep):
     with pytest.raises(ValueError):

@@ -2,6 +2,7 @@ import collections
 import contextlib
 import functools
 import importlib
+import keyword
 import os
 import string
 import tempfile
@@ -46,7 +47,7 @@ def strings(draw):
 
 @st.composite
 def names(draw):
-    keywords = {"import", "in", "not", "and", "or", "product", "union", "table"}
+    keywords = set(keyword.kwlist) | {"product", "union", "table"}
 
     name = None
     while name in keywords or name is None:
@@ -316,6 +317,7 @@ def sweeps(
     draw,
     with_imports=True,
     with_includes=True,
+    force_block=False,
     leaf_sts=None,
     allow_empty=True,
 ):
@@ -331,6 +333,10 @@ def sweeps(
             allow_empty=allow_empty,
         )
     )
+    if force_block:
+        index = draw(st.integers(min_value=0, max_value=len(statements)))
+        block = draw(sweep_statement_extend(st.one_of(*leaf_sts)))
+        statements.insert(index, block)
     return ast.Sweep(statements=(tuple(prelude) + tuple(statements)))
 
 
@@ -390,11 +396,6 @@ def extract_used_configurables(config):
                 name for (name, _) in node.arguments
             )
 
-        if type(node) is ast.Macro:
-            module_and_name = (None, node.name)
-            # Macros are just configurables with an argument `value`.
-            configurable_to_parameters[module_and_name].add("value")
-
         if type(node) is ast.Header:
             for identifier in node.identifiers:
                 extract_from_binding_identifier(identifier)
@@ -420,7 +421,6 @@ def save_used_configurables_as_module(config, path):
             for param in parameters:
                 f.write(f"        '{param}': {param},\n")
             f.write("    }\n")
-            # f.write("    return " + parameters[0] if parameters else "0" + "\n")
             f.write(f"{name} = gin.external_configurable({name}")
             if module is not None:
                 f.write(f', module="{module}"')
@@ -484,5 +484,7 @@ def constants_to_macros(config):
             macro_bindings.append(ast.Binding(identifier=identifier, expr=x))
             return ast.Macro(name=name)
 
-    transforms.fold(memorize_value, config)
+        return x
+
+    config = transforms.fold(memorize_value, config)
     return config._replace(statements=(config.statements + tuple(macro_bindings)))

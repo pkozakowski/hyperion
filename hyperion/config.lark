@@ -20,7 +20,7 @@ name: NAME
      | list
      | tuple
      | call
-     | _LPAREN expr _RPAREN
+     | parenthesis
      | "%" name       -> macro
      | "@" identifier -> reference
      | STRING         -> string
@@ -36,10 +36,13 @@ cs_list{item}: _cs_list{item}
 
 list: _LBRACKET _cs_list{expr}? _RBRACKET
 
-tuple: _LPAREN _cs_list{expr}? _RPAREN
+tuple: _LPAREN _RPAREN
+      | _LPAREN expr "," _cs_list{expr}? _RPAREN
 
 call: "@" identifier _LPAREN cs_list{argument}? _RPAREN
 argument: name "=" expr
+
+parenthesis: _LPAREN expr _RPAREN
 
 ?pow_op: pow_op "**" pow_op -> pow
        | atom

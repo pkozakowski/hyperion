@@ -164,6 +164,7 @@ def _eval_bindings(config):
 
 
 def _check_bindings(rendered_config, evaluated_bindings):
+    ht.note(f"Rendered config: {rendered_config}")
     parsed_config = parsing.parse_config(rendered_config)
 
     _unload_configurables()
