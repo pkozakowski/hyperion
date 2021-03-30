@@ -1,3 +1,4 @@
+import collections
 import contextlib
 import functools
 import operator
@@ -11,6 +12,7 @@ import pytest
 
 from hyperion import ast
 from hyperion import e2e
+from hyperion import parsing
 from hyperion import rendering
 from hyperion import runtime
 from hyperion import sweeps
@@ -29,6 +31,9 @@ settings = {
 
 
 configs_without_prelude = testing.configs(with_imports=False, with_includes=False)
+safe_configs_without_prelude = testing.configs(
+    with_imports=False, with_includes=False, safe=True, flat=True
+)
 sweeps_without_prelude = testing.sweeps(with_imports=False, with_includes=False)
 
 
@@ -146,10 +151,32 @@ def _python_path(path):
         sys.path.pop()
 
 
-# TODO: Test:
-# - that bindings get correct values (just static); 2 variants:
-#   - standalone
-#   - with an include and an import (as before)
+def _eval_bindings(config):
+    evaluated_config = transforms.partial_eval(config)
+    configurable_to_bindings = collections.defaultdict(dict)
+    for binding in evaluated_config.statements:
+        if type(binding) is not ast.Binding:
+            continue
+        name = binding.identifier.namespace.path[-1]
+        argument = binding.identifier.name
+        configurable_to_bindings[name][argument] = binding.expr
+    return configurable_to_bindings
+
+
+def _check_bindings(rendered_config, evaluated_bindings):
+    parsed_config = parsing.parse_config(rendered_config)
+
+    _unload_configurables()
+
+    with testing.try_in_gin_sandbox() as gin:
+        locals = testing.register_used_configurables(parsed_config)
+        runtime.register(gin)
+        e2e.register(gin)
+        e2e.parse_config(rendered_config)
+
+        locals.pop("gin")
+        for (name, fn) in locals.items():
+            assert fn() == evaluated_bindings[name]
 
 
 @ht.settings(**settings)
@@ -160,12 +187,32 @@ def test_parse_config_succeeds_without_prelude(config):
 
 
 @ht.settings(**settings)
+@ht.given(safe_configs_without_prelude)
+def test_parse_config_binds_correct_values_without_prelude(config):
+    evaluated_bindings = _eval_bindings(config)
+    lazified_config = testing.constants_to_macros(config)
+    rendered_config = rendering.render(lazified_config)
+    _check_bindings(rendered_config, evaluated_bindings)
+
+
+@ht.settings(**settings)
 @ht.given(configs_without_prelude)
 def test_parse_config_succeeds_with_prelude(tmpdir_factory, config):
     (config, tmpdir) = _add_prelude(config, tmpdir_factory)
     rendered_config = rendering.render(config)
     with _python_path(tmpdir):
         _try_to_parse_config(lambda: e2e.parse_config(rendered_config))
+
+
+@ht.settings(**settings)
+@ht.given(safe_configs_without_prelude)
+def test_parse_config_binds_correct_values_with_prelude(tmpdir_factory, config):
+    (config, tmpdir) = _add_prelude(config, tmpdir_factory)
+    evaluated_bindings = _eval_bindings(config)
+    lazified_config = testing.constants_to_macros(config)
+    rendered_config = rendering.render(lazified_config)
+    with _python_path(tmpdir):
+        _check_bindings(rendered_config, evaluated_bindings)
 
 
 @ht.settings(**settings)

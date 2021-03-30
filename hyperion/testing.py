@@ -2,6 +2,7 @@ import collections
 import contextlib
 import functools
 import importlib
+import os
 import string
 import tempfile
 
@@ -18,8 +19,20 @@ from hyperion import transforms
 max_size = 2
 
 
-unary_operators = lambda: st.one_of(*map(st.just, ast.unary_operators))
-binary_operators = lambda: st.one_of(*map(st.just, ast.binary_operators))
+def unary_operators(safe):
+    if safe:
+        operators = ast.safe_unary_operators
+    else:
+        operators = ast.unary_operators
+    return st.one_of(*map(st.just, operators))
+
+
+def binary_operators(safe):
+    if safe:
+        operators = ast.safe_binary_operators
+    else:
+        operators = ast.binary_operators
+    return st.one_of(*map(st.just, operators))
 
 
 @st.composite
@@ -76,17 +89,22 @@ def scopes(draw):
 
 
 @st.composite
-def namespaces(draw, min_size):
-    path_st = internal_lists(names(), min_size=min_size)
+def namespaces(draw, min_size, max_size):
+    path_st = internal_lists(names(), min_size=min_size, max_size=max_size)
     return ast.Namespace(path=tuple(draw(path_st)))
 
 
 @st.composite
-def identifiers(draw, with_module=False):
+def identifiers(draw, with_module=False, flat=False):
+    if flat:
+        scope = ast.Scope(path=())
+    else:
+        scope = draw(scopes())
     min_size = 2 if with_module else 1
+    local_max_size = min_size if flat else max_size
     return ast.Identifier(
-        scope=draw(scopes()),
-        namespace=draw(namespaces(min_size=min_size)),
+        scope=scope,
+        namespace=draw(namespaces(min_size=min_size, max_size=local_max_size)),
         name=draw(names()),
     )
 
@@ -99,8 +117,8 @@ def references(draw):
 def expr_base(for_eval):
     base_sts = [
         st.booleans(),
-        st.integers(min_value=0),
-        st.floats(min_value=0.0, allow_infinity=False, allow_nan=False),
+        st.integers(min_value=0, max_value=10),
+        st.floats(min_value=0.0, max_value=10.0, allow_nan=False),
     ]
     if not for_eval:
         base_sts += [
@@ -140,21 +158,21 @@ def calls(draw, expr_st):
 
 
 @st.composite
-def unary_ops(draw, expr_st):
+def unary_ops(draw, expr_st, safe):
     return ast.UnaryOp(
-        operator=draw(unary_operators()),
+        operator=draw(unary_operators(safe=safe)),
         operand=draw(expr_st),
     )
 
 
 @st.composite
-def binary_ops(draw, expr_st, for_eval):
+def binary_ops(draw, expr_st, for_eval, safe):
     ok = False
     while not ok:
         ok = True
         op = ast.BinaryOp(
             left=draw(expr_st),
-            operator=draw(binary_operators()),
+            operator=draw(binary_operators(safe=safe)),
             right=draw(expr_st),
         )
         if for_eval:
@@ -174,23 +192,26 @@ def binary_ops(draw, expr_st, for_eval):
     return op
 
 
-def expr_extend(expr_st, for_eval):
-    extends = [unary_ops, functools.partial(binary_ops, for_eval=for_eval)]
+def expr_extend(expr_st, for_eval, safe):
+    extends = [
+        functools.partial(unary_ops, safe=safe),
+        functools.partial(binary_ops, for_eval=for_eval, safe=safe),
+    ]
     if not for_eval:
         extends += [tuples, lists, calls, dicts]
     return st.one_of(*(extend(expr_st) for extend in extends))
 
 
-def exprs(for_eval=False):
+def exprs(for_eval=False, safe=False):
     return st.recursive(
         expr_base(for_eval=for_eval),
-        functools.partial(expr_extend, for_eval=for_eval),
+        functools.partial(expr_extend, for_eval=for_eval, safe=safe),
     )
 
 
 @st.composite
 def imports(draw):
-    return ast.Import(namespace=draw(namespaces(min_size=1)))
+    return ast.Import(namespace=draw(namespaces(min_size=1, max_size=max_size)))
 
 
 @st.composite
@@ -199,10 +220,10 @@ def includes(draw):
 
 
 @st.composite
-def bindings(draw):
+def bindings(draw, safe, flat=False):
     return ast.Binding(
-        identifier=draw(identifiers(with_module=True)),
-        expr=draw(exprs()),
+        identifier=draw(identifiers(with_module=(not flat), flat=flat)),
+        expr=draw(exprs(for_eval=safe, safe=safe)),
     )
 
 
@@ -216,13 +237,13 @@ def prelude_statements(with_imports, with_includes):
 
 
 @st.composite
-def configs(draw, with_imports=True, with_includes=True):
+def configs(draw, with_imports=True, with_includes=True, safe=False, flat=False):
     if with_imports or with_includes:
         prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
     else:
         prelude = ()
 
-    bds = draw(internal_lists(bindings()))
+    bds = draw(internal_lists(bindings(safe=safe, flat=flat)))
     return ast.Config(statements=(tuple(prelude) + tuple(bds)))
 
 
@@ -291,17 +312,6 @@ def sweep_statements(leaf_sts, with_imports):
 
 
 @st.composite
-def configs(draw, with_imports=True, with_includes=True):
-    if with_imports or with_includes:
-        prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
-    else:
-        prelude = ()
-
-    bds = draw(internal_lists(bindings()))
-    return ast.Config(statements=(tuple(prelude) + tuple(bds)))
-
-
-@st.composite
 def sweeps(
     draw,
     with_imports=True,
@@ -314,7 +324,7 @@ def sweeps(
     else:
         prelude = ()
 
-    leaf_sts = leaf_sts or [bindings(), alls(), tables()]
+    leaf_sts = leaf_sts or [bindings(safe=False), alls(), tables()]
     statements = draw(
         internal_lists(
             sweep_statements(leaf_sts, with_imports=with_imports),
@@ -406,7 +416,11 @@ def save_used_configurables_as_module(config, path):
 
             args = ", ".join(parameters)
             f.write(f"def {name}({args}):\n")
-            f.write("    pass\n")
+            f.write("    return {\n")
+            for param in parameters:
+                f.write(f"        '{param}': {param},\n")
+            f.write("    }\n")
+            # f.write("    return " + parameters[0] if parameters else "0" + "\n")
             f.write(f"{name} = gin.external_configurable({name}")
             if module is not None:
                 f.write(f', module="{module}"')
@@ -417,10 +431,13 @@ def save_used_configurables_as_module(config, path):
 
 
 def register_used_configurables(config):
-    path = tempfile.NamedTemporaryFile().name
+    path = tempfile.NamedTemporaryFile(suffix=".py").name
+
     save_used_configurables_as_module(config, path)
     with open(path, "r") as f:
-        exec(f.read(), {}, {})
+        locals = {}
+        exec(f.read(), {}, locals)
+        return locals
 
 
 @contextlib.contextmanager
@@ -455,3 +472,17 @@ def try_with_eval():
     except Exception as e:
         if type(e) not in allowed_eval_exceptions:
             raise
+
+
+def constants_to_macros(config):
+    macro_bindings = []
+
+    def memorize_value(x):
+        if type(x) in (bool, int, float, complex):
+            name = f"m{len(macro_bindings)}"
+            identifier = transforms.make_identifier(namespace_path=(), name=name)
+            macro_bindings.append(ast.Binding(identifier=identifier, expr=x))
+            return ast.Macro(name=name)
+
+    transforms.fold(memorize_value, config)
+    return config._replace(statements=(config.statements + tuple(macro_bindings)))

@@ -90,6 +90,8 @@ comparison_operators = {
     "in_",
     "not_in",
 }
+safe_unary_operators = {"pos", "neg"}
+safe_binary_operators = {"add", "sub", "mul"}
 
 
 def operator_chars(operator):
