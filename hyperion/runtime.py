@@ -11,5 +11,5 @@ def eval_binary_op(l, o, r):
 
 def register(gin):
     # Use short names to minimize the generated configs.
-    gin.external_configurable(eval_unary_op, name="u", module="_h")
-    gin.external_configurable(eval_binary_op, name="b", module="_h")
+    gin.external_configurable(eval_unary_op, name="_u", module="_h")
+    gin.external_configurable(eval_binary_op, name="_b", module="_h")

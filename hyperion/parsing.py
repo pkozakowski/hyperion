@@ -4,6 +4,7 @@ import lark
 from lark import indenter
 
 from hyperion import ast
+from hyperion import transforms
 
 
 class ConfigTransformer(lark.Transformer):
@@ -38,7 +39,7 @@ class ConfigTransformer(lark.Transformer):
 
     config = lambda self, statements: ast.Config(tuple(statements))
     import_ = ast.Import._make
-    include = lambda self, tokens: ast.Include(path=str(ast.String.from_tokens(tokens)))
+    include = lambda self, tokens: ast.Include(path=ast.String.from_tokens(tokens))
     binding = ast.Binding._make
     scope = lambda self, path: ast.Scope(tuple(path))
     namespace = lambda self, path: ast.Namespace(tuple(path))
@@ -46,6 +47,7 @@ class ConfigTransformer(lark.Transformer):
     argument = tuple
     cs_list = tuple
     _cs_list = tuple
+    parenthesis = ast.Parenthesis._make
 
     macro = ast.Macro._make
     reference = ast.Reference._make
@@ -62,17 +64,29 @@ class ConfigTransformer(lark.Transformer):
     def _ambig(self, options):
         # Ambiguity occurs only for binary operators.
         assert all(type(option) is ast.BinaryOp for option in options)
-        # Choose the option where an operation of the same precedence as the
-        # root is on the left-hand side, unless it's exponentiation - then choose the
-        # right-hand side.
+        # Choose the option where an operation of the same precedence as the root
+        # is on the left-hand side, and the one on the right-hand side, if any,
+        # has different precedence. If it's exponentiation, do the reverse.
         for root in options:
-            chained = root.right if root.operator == "pow" else root.left
+            if root.operator == "pow":
+                chained = root.right
+                other = root.left
+            else:
+                chained = root.left
+                other = root.right
 
             if type(chained) is not ast.BinaryOp:
                 continue
+
+            if type(other) is ast.BinaryOp:
+                other_precedence = ast.operator_precedence(other.operator)
+            else:
+                # Parentheses also fall here.
+                other_precedence = 0
+
             root_precedence = ast.operator_precedence(root.operator)
             chained_precedence = ast.operator_precedence(chained.operator)
-            if root_precedence == chained_precedence:
+            if root_precedence == chained_precedence != other_precedence:
                 return root
 
 
@@ -123,11 +137,30 @@ def open_grammar(name, start):
 
 
 config_grammar = open_grammar("config.lark", "config")
+expr_grammar = open_grammar("config.lark", "expr")
+
+
+def remove_parentheses(tree):
+    def remove_parenthesis(node):
+        if type(node) is ast.Parenthesis:
+            return node.expr
+        return node
+
+    return transforms.fold(remove_parenthesis, tree)
 
 
 def parse_config(text):
     parse_tree = config_grammar.parse(text)
-    return ConfigTransformer().transform(parse_tree)
+    tree = ConfigTransformer().transform(parse_tree)
+    # We only need parentheses for resolving ambiguities, so we remove them
+    # right after parsing.
+    return remove_parentheses(tree)
+
+
+def parse_expr(text):
+    parse_tree = expr_grammar.parse(text)
+    tree = ConfigTransformer().transform(parse_tree)
+    return remove_parentheses(tree)
 
 
 class SweepTransformer(lark.Transformer):
@@ -154,4 +187,5 @@ sweep_grammar = open_grammar("sweep.lark", "sweep")
 def parse_sweep(text):
     text += "\n"
     parse_tree = sweep_grammar.parse(text)
-    return SweepTransformer().transform(parse_tree)
+    tree = SweepTransformer().transform(parse_tree)
+    return remove_parentheses(tree)

@@ -2,7 +2,10 @@ import collections
 import contextlib
 import functools
 import importlib
+import keyword
+import os
 import string
+import tempfile
 
 import gin
 import hypothesis
@@ -17,8 +20,20 @@ from hyperion import transforms
 max_size = 2
 
 
-unary_operators = lambda: st.one_of(*map(st.just, ast.unary_operators))
-binary_operators = lambda: st.one_of(*map(st.just, ast.binary_operators))
+def unary_operators(safe):
+    if safe:
+        operators = ast.safe_unary_operators
+    else:
+        operators = ast.unary_operators
+    return st.one_of(*map(st.just, operators))
+
+
+def binary_operators(safe):
+    if safe:
+        operators = ast.safe_binary_operators
+    else:
+        operators = ast.binary_operators
+    return st.one_of(*map(st.just, operators))
 
 
 @st.composite
@@ -32,7 +47,7 @@ def strings(draw):
 
 @st.composite
 def names(draw):
-    keywords = {"import", "in", "not", "and", "or", "product", "union", "table"}
+    keywords = set(keyword.kwlist) | {"product", "union", "table"}
 
     name = None
     while name in keywords or name is None:
@@ -75,16 +90,22 @@ def scopes(draw):
 
 
 @st.composite
-def namespaces(draw, allow_empty):
-    path_st = internal_lists(names(), allow_empty=allow_empty)
+def namespaces(draw, min_size, max_size):
+    path_st = internal_lists(names(), min_size=min_size, max_size=max_size)
     return ast.Namespace(path=tuple(draw(path_st)))
 
 
 @st.composite
-def identifiers(draw):
+def identifiers(draw, with_module=False, flat=False):
+    if flat:
+        scope = ast.Scope(path=())
+    else:
+        scope = draw(scopes())
+    min_size = 2 if with_module else 1
+    local_max_size = min_size if flat else max_size
     return ast.Identifier(
-        scope=draw(scopes()),
-        namespace=draw(namespaces(allow_empty=False)),
+        scope=scope,
+        namespace=draw(namespaces(min_size=min_size, max_size=local_max_size)),
         name=draw(names()),
     )
 
@@ -97,8 +118,8 @@ def references(draw):
 def expr_base(for_eval):
     base_sts = [
         st.booleans(),
-        st.integers(min_value=0),
-        st.floats(min_value=0.0, allow_infinity=False, allow_nan=False),
+        st.integers(min_value=0, max_value=10),
+        st.floats(min_value=0.0, max_value=10.0, allow_nan=False),
     ]
     if not for_eval:
         base_sts += [
@@ -138,21 +159,21 @@ def calls(draw, expr_st):
 
 
 @st.composite
-def unary_ops(draw, expr_st):
+def unary_ops(draw, expr_st, safe):
     return ast.UnaryOp(
-        operator=draw(unary_operators()),
+        operator=draw(unary_operators(safe=safe)),
         operand=draw(expr_st),
     )
 
 
 @st.composite
-def binary_ops(draw, expr_st, for_eval):
+def binary_ops(draw, expr_st, for_eval, safe):
     ok = False
     while not ok:
         ok = True
         op = ast.BinaryOp(
             left=draw(expr_st),
-            operator=draw(binary_operators()),
+            operator=draw(binary_operators(safe=safe)),
             right=draw(expr_st),
         )
         if for_eval:
@@ -172,23 +193,26 @@ def binary_ops(draw, expr_st, for_eval):
     return op
 
 
-def expr_extend(expr_st, for_eval):
-    extends = [unary_ops, functools.partial(binary_ops, for_eval=for_eval)]
+def expr_extend(expr_st, for_eval, safe):
+    extends = [
+        functools.partial(unary_ops, safe=safe),
+        functools.partial(binary_ops, for_eval=for_eval, safe=safe),
+    ]
     if not for_eval:
         extends += [tuples, lists, calls, dicts]
     return st.one_of(*(extend(expr_st) for extend in extends))
 
 
-def exprs(for_eval=False):
+def exprs(for_eval=False, safe=False):
     return st.recursive(
         expr_base(for_eval=for_eval),
-        functools.partial(expr_extend, for_eval=for_eval),
+        functools.partial(expr_extend, for_eval=for_eval, safe=safe),
     )
 
 
 @st.composite
 def imports(draw):
-    return ast.Import(namespace=draw(namespaces(allow_empty=False)))
+    return ast.Import(namespace=draw(namespaces(min_size=1, max_size=max_size)))
 
 
 @st.composite
@@ -197,10 +221,10 @@ def includes(draw):
 
 
 @st.composite
-def bindings(draw):
+def bindings(draw, safe, flat=False):
     return ast.Binding(
-        identifier=draw(identifiers()),
-        expr=draw(exprs()),
+        identifier=draw(identifiers(with_module=(not flat), flat=flat)),
+        expr=draw(exprs(for_eval=safe, safe=safe)),
     )
 
 
@@ -214,20 +238,20 @@ def prelude_statements(with_imports, with_includes):
 
 
 @st.composite
-def configs(draw, with_imports=True, with_includes=True):
+def configs(draw, with_imports=True, with_includes=True, safe=False, flat=False):
     if with_imports or with_includes:
         prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
     else:
         prelude = ()
 
-    bds = draw(internal_lists(bindings()))
+    bds = draw(internal_lists(bindings(safe=safe, flat=flat)))
     return ast.Config(statements=(tuple(prelude) + tuple(bds)))
 
 
 @st.composite
 def alls(draw):
     return ast.All(
-        identifier=draw(identifiers()),
+        identifier=draw(identifiers(with_module=True)),
         exprs=tuple(draw(internal_lists(exprs(), allow_empty=False))),
     )
 
@@ -289,21 +313,11 @@ def sweep_statements(leaf_sts, with_imports):
 
 
 @st.composite
-def configs(draw, with_imports=True, with_includes=True):
-    if with_imports or with_includes:
-        prelude = draw(internal_lists(prelude_statements(with_imports, with_includes)))
-    else:
-        prelude = ()
-
-    bds = draw(internal_lists(bindings()))
-    return ast.Config(statements=(tuple(prelude) + tuple(bds)))
-
-
-@st.composite
 def sweeps(
     draw,
     with_imports=True,
     with_includes=True,
+    force_block=False,
     leaf_sts=None,
     allow_empty=True,
 ):
@@ -312,13 +326,17 @@ def sweeps(
     else:
         prelude = ()
 
-    leaf_sts = leaf_sts or [bindings(), alls(), tables()]
+    leaf_sts = leaf_sts or [bindings(safe=False), alls(), tables()]
     statements = draw(
         internal_lists(
             sweep_statements(leaf_sts, with_imports=with_imports),
             allow_empty=allow_empty,
         )
     )
+    if force_block:
+        index = draw(st.integers(min_value=0, max_value=len(statements)))
+        block = draw(sweep_statement_extend(st.one_of(*leaf_sts)))
+        statements.insert(index, block)
     return ast.Sweep(statements=(tuple(prelude) + tuple(statements)))
 
 
@@ -355,24 +373,32 @@ def extract_used_configurables(config):
     def identifier_module_and_name(identifier):
         return (render_module(identifier.namespace.path), identifier.name)
 
-    def extract_from_node(node):
-        if type(node) is ast.Binding:
-            path = node.identifier.namespace.path
-            if path:
-                # Regular binding.
-                module_and_name = (render_module(path[:-1]), path[-1])
-                configurable_to_parameters[module_and_name].add(node.identifier.name)
-            # Otherwise, it's a macro assignment - no action required.
+    def extract_from_binding_identifier(identifier):
+        path = identifier.namespace.path
+        if path:
+            # Regular binding.
+            module_and_name = (render_module(path[:-1]), path[-1])
+            configurable_to_parameters[module_and_name].add(identifier.name)
+        # Otherwise, it's a macro assignment - no action required.
 
-        if type(node) in (ast.Reference, ast.Call):
+    def extract_from_node(node):
+        if type(node) in (ast.Binding, ast.All):
+            extract_from_binding_identifier(node.identifier)
+
+        if type(node) is ast.Reference:
             module_and_name = identifier_module_and_name(node.identifier)
             # Just add it to the dict.
             configurable_to_parameters[module_and_name]
 
-        if type(node) is ast.Macro:
-            module_and_name = (None, node.name)
-            # Macros are just configurables with an argument `value`.
-            configurable_to_parameters[module_and_name].add("value")
+        if type(node) is ast.Call:
+            module_and_name = identifier_module_and_name(node.identifier)
+            configurable_to_parameters[module_and_name] |= set(
+                name for (name, _) in node.arguments
+            )
+
+        if type(node) is ast.Header:
+            for identifier in node.identifiers:
+                extract_from_binding_identifier(identifier)
 
         return node
 
@@ -380,31 +406,85 @@ def extract_used_configurables(config):
     return configurable_to_parameters
 
 
-def register_used_configurables(gin, statements):
-    configurable_to_parameters = dict(extract_used_configurables(statements))
-    hypothesis.note(
-        f"Registering configurables with parameters: {configurable_to_parameters}"
-    )
+def save_used_configurables_as_module(config, path):
+    configurable_to_parameters = dict(extract_used_configurables(config))
 
-    for ((module, name), parameters) in configurable_to_parameters.items():
-        args = ", ".join(parameters)
-        f = eval(f"lambda {args}: None", {}, {})
-        gin.external_configurable(f, module=module, name=name)
+    with open(path, "w") as f:
+        f.write("import gin\n")
+        for ((module, name), parameters) in configurable_to_parameters.items():
+            if module == "_h" and name in ("u", "b"):
+                continue
+
+            args = ", ".join(parameters)
+            f.write(f"def {name}({args}):\n")
+            f.write("    return {\n")
+            for param in parameters:
+                f.write(f"        '{param}': {param},\n")
+            f.write("    }\n")
+            f.write(f"{name} = gin.external_configurable({name}")
+            if module is not None:
+                f.write(f', module="{module}"')
+            f.write(")\n")
+
+    with open(path, "r") as f:
+        hypothesis.note("Module with configurables: " + path + "\n" + f.read())
 
 
-def try_to_parse_config_using_gin(config):
-    rendered_config = rendering.render(config)
-    hypothesis.note(f"Rendered config: {rendered_config}")
+def register_used_configurables(config):
+    path = tempfile.NamedTemporaryFile(suffix=".py").name
 
+    save_used_configurables_as_module(config, path)
+    with open(path, "r") as f:
+        locals = {}
+        exec(f.read(), {}, locals)
+        return locals
+
+
+@contextlib.contextmanager
+def try_in_gin_sandbox(config=None):
     with gin_sandbox() as gin:
-        register_used_configurables(gin, config)
+        if config is not None:
+            register_used_configurables(config)
 
         try:
-            gin.parse_config(rendered_config)
+            yield gin
         except TypeError as e:
             # The only exception we allow here, for cases like {[]: ...}.
             if "unhashable type" not in str(e):
                 raise
 
 
+def try_to_parse_config_using_gin(config):
+    rendered_config = rendering.render(config)
+    hypothesis.note(f"Rendered config: {rendered_config}")
+
+    with try_in_gin_sandbox(config) as gin:
+        gin.parse_config(rendered_config)
+
+
 allowed_eval_exceptions = {OverflowError, TypeError, ValueError, ZeroDivisionError}
+
+
+@contextlib.contextmanager
+def try_with_eval():
+    try:
+        yield
+    except Exception as e:
+        if type(e) not in allowed_eval_exceptions:
+            raise
+
+
+def constants_to_macros(config):
+    macro_bindings = []
+
+    def memorize_value(x):
+        if type(x) in (bool, int, float, complex):
+            name = f"m{len(macro_bindings)}"
+            identifier = transforms.make_identifier(namespace_path=(), name=name)
+            macro_bindings.append(ast.Binding(identifier=identifier, expr=x))
+            return ast.Macro(name=name)
+
+        return x
+
+    config = transforms.fold(memorize_value, config)
+    return config._replace(statements=(config.statements + tuple(macro_bindings)))

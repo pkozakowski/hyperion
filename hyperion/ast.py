@@ -15,6 +15,7 @@ Macro = collections.namedtuple("Macro", ["name"])
 Reference = collections.namedtuple("Reference", ["identifier"])
 UnaryOp = collections.namedtuple("UnaryOp", ["operator", "operand"])
 BinaryOp = collections.namedtuple("BinaryOp", ["left", "operator", "right"])
+Parenthesis = collections.namedtuple("Parenthesis", ["expr"])
 Dict = collections.namedtuple("Dict", ["items"])
 List = collections.namedtuple("List", ["items"])
 Tuple = collections.namedtuple("Tuple", ["items"])
@@ -90,6 +91,8 @@ comparison_operators = {
     "in_",
     "not_in",
 }
+safe_unary_operators = {"pos", "neg"}
+safe_binary_operators = {"add", "sub", "mul"}
 
 
 def operator_chars(operator):

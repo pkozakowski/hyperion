@@ -14,11 +14,8 @@ def _test_idempotence(transform, original):
 
 
 def _test_partial_idempotence(transform, original):
-    try:
+    with testing.try_with_eval():
         _test_idempotence(transform, original)
-    except Exception as e:
-        if type(e) not in testing.allowed_eval_exceptions:
-            raise
 
 
 @pytest.mark.parametrize(
@@ -47,15 +44,10 @@ def test_config_partial_idempotence(transform, config):
 
 @hypothesis.given(testing.configs(with_imports=False, with_includes=False))
 def test_preprocess_config_produces_gin_parsable_output(config):
-    try:
+    with testing.try_with_eval():
         preprocessed_config = transforms.preprocess_config(config)
-    except Exception as e:
-        if type(e) in testing.allowed_eval_exceptions:
-            return
-        else:
-            raise
 
-    testing.try_to_parse_config_using_gin(preprocessed_config)
+        testing.try_to_parse_config_using_gin(preprocessed_config)
 
 
 @pytest.mark.filterwarnings("ignore::SyntaxWarning")
@@ -85,16 +77,8 @@ def test_validate_sweep_accepts_valid_sweeps(sweep):
     transforms.validate_sweep(sweep)
 
 
-def has_blocks(sweep):
-    return any(
-        type(statement) in (ast.Product, ast.Union) for statement in sweep.statements
-    )
-
-
 @hypothesis.given(
-    testing.sweeps(leaf_sts=[testing.tables(correct=False)], allow_empty=False).filter(
-        has_blocks
-    )
+    testing.sweeps(leaf_sts=[testing.tables(correct=False)], force_block=True)
 )
 def test_validate_sweep_raises_on_incorrect_tables(sweep):
     with pytest.raises(ValueError):
