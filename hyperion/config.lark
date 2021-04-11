@@ -1,4 +1,9 @@
-config: _NL? _nls_list{prelude_statement}? _nls_list{binding}?
+config: _NL? _nls_list{prelude_statement}? statement*
+
+?statement: binding _NL
+          | _block{with_header,statement} -> with_
+
+?with_header: "with" namespace
 
 _nls_list{item}: item (_NL item)* _NL?
 
@@ -7,6 +12,8 @@ _nls_list{item}: item (_NL item)* _NL?
 import_: "import" namespace
 namespace: (name ".")* name
 binding: identifier "=" expr
+
+_block{header,line}: header ":" _NL _INDENT line+ _DEDENT
 
 include: "include" STRING
 
@@ -106,3 +113,5 @@ COMMENT: _COMMENT _NL
 
 %ignore COMMENT
 %ignore WS_INLINE
+
+%declare _INDENT _DEDENT

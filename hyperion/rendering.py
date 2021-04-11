@@ -104,8 +104,12 @@ def add_indent(text):
 
 
 def render_block(node):
-    name = {ast.Product: "product", ast.Union: "union"}[type(node)]
-    return f"{name}:\n" + "\n".join(map(add_indent, node.statements))
+    header = {
+        ast.Product: lambda: "product",
+        ast.Union: lambda: "union",
+        ast.With: lambda: f"with {node.namespace}",
+    }[type(node)]()
+    return f"{header}:\n" + "\n".join(map(add_indent, node.statements))
 
 
 def render_table(node):
@@ -127,6 +131,7 @@ def render_node(node):
         ast.Binding: render_binding,
         ast.Identifier: render_identifier,
         ast.Scope: lambda node: "/".join(node.path),
+        ast.With: render_block,
         ast.UnaryOp: render_unary_op,
         ast.BinaryOp: render_binary_op,
         ast.Dict: render_dict,

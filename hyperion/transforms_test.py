@@ -21,6 +21,7 @@ def _test_partial_idempotence(transform, original):
 @pytest.mark.parametrize(
     "transform",
     (
+        transforms.flatten_withs,
         transforms.expressions_to_calls,
         transforms.calls_to_evaluated_references,
     ),
@@ -46,6 +47,11 @@ def test_config_partial_idempotence(transform, config):
 def test_preprocess_config_produces_gin_parsable_output(config):
     with testing.try_with_eval():
         preprocessed_config = transforms.preprocess_config(config)
+
+        def assume_not_complex(x):
+            hypothesis.assume(type(x) is not complex)
+
+        transforms.fold(assume_not_complex, preprocessed_config)
 
         testing.try_to_parse_config_using_gin(preprocessed_config)
 
@@ -135,3 +141,50 @@ def test_bindings_to_singletons_removes_bindings(sweep):
             pytest.fail()
 
     transforms.fold(fail_on_binding, transformed_sweep)
+
+
+@hypothesis.given(testing.sweeps())
+def test_flatten_withs_removes_withs(sweep):
+    flat_sweep = transforms.flatten_withs(sweep)
+
+    def fail_on_with(node):
+        if type(node) is ast.With:
+            pytest.fail()
+
+    transforms.fold(fail_on_with, flat_sweep)
+
+
+@hypothesis.given(
+    testing.namespaces(),
+    testing.sweeps(with_withs=False, with_imports=False),
+)
+def test_flatten_withs_adds_namespace_prefix(namespace, sweep):
+    def assume_no_rvalue_identifiers(node):
+        hypothesis.assume(type(node) not in (ast.Reference, ast.Call))
+
+    transforms.fold(assume_no_rvalue_identifiers, sweep)
+
+    with_sweep = ast.Sweep(statements=(ast.With(namespace, sweep.statements),))
+    flattened_sweep = transforms.flatten_withs(with_sweep)
+
+    def assert_namespace_has_prefix(node):
+        if type(node) is ast.Namespace:
+            assert node.path[: len(namespace.path)] == namespace.path
+        return node
+
+    transforms.fold(assert_namespace_has_prefix, flattened_sweep)
+
+
+@hypothesis.given(testing.namespaces(), testing.sweeps(with_withs=False))
+def test_flatten_withs_preserves_inner_structure(namespace, sweep):
+    with_sweep = ast.Sweep(statements=(ast.With(namespace, sweep.statements),))
+    flattened_sweep = transforms.flatten_withs(with_sweep)
+
+    def erase_identifiers(node):
+        if type(node) is ast.Identifier:
+            node = None
+        return node
+
+    assert transforms.fold(erase_identifiers, sweep) == transforms.fold(
+        erase_identifiers, flattened_sweep
+    )
