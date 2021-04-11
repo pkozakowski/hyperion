@@ -2,7 +2,7 @@ import collections
 import functools
 import operator
 
-import hypothesis
+import hypothesis as ht
 from hypothesis import strategies as st
 import pytest
 
@@ -27,12 +27,12 @@ def sweep_lists(allow_empty=True):
     return st.lists(st_sweeps(allow_empty), max_size=4)
 
 
-@hypothesis.given(st.integers(), st.integers())
+@ht.given(st.integers(), st.integers())
 def test_singleton_equals_all_of_one_value(name, value):
     assert list(sweeps.singleton(name, value)) == list(sweeps.all(name, [value]))
 
 
-@hypothesis.given(st.integers(), st.sets(st.integers()))
+@ht.given(st.integers(), st.sets(st.integers()))
 def test_all_produces_all_values_with_specified_name(name, values):
     sweep = list(sweeps.all(name, values))
     assert len(sweep) == len(values)
@@ -47,7 +47,7 @@ def test_all_produces_all_values_with_specified_name(name, values):
         (sweeps.product, sweeps.unit),
     ],
 )
-@hypothesis.given(st_sweeps())
+@ht.given(st_sweeps())
 def test_identity(sweep_operator, identity, sweep):
     assert list(sweep_operator(identity(), sweep)) == sweep
     assert list(sweep_operator(sweep, identity())) == sweep
@@ -60,7 +60,7 @@ def test_identity(sweep_operator, identity, sweep):
         (sweeps.product, operator.mul, 1),
     ],
 )
-@hypothesis.given(sweep_lists())
+@ht.given(sweep_lists())
 def test_cardinality(sweep_operator, card_operator, card_identity, sweep_list):
     expected_card = functools.reduce(card_operator, map(len, sweep_list), card_identity)
     actual_card = len(list(sweep_operator(*sweep_list)))
@@ -75,7 +75,7 @@ def freeze_sweep(sweep):
     return set(map(freeze_config_dict, sweep))
 
 
-@hypothesis.given(sweep_lists())
+@ht.given(sweep_lists())
 def test_union_completeness(sweep_list):
     frozen_union_sweep = freeze_sweep(sweeps.union(*sweep_list))
     for sweep in sweep_list:
@@ -106,13 +106,13 @@ def disjoint_names(sweep_list):
     return True
 
 
-@hypothesis.given(sweep_lists().filter(unique_config_dicts).filter(disjoint_names))
+@ht.given(sweep_lists().filter(unique_config_dicts).filter(disjoint_names))
 def test_product_uniqueness(sweep_list):
     product_sweep = list(sweeps.product(*sweep_list))
     assert len(product_sweep) == len(freeze_sweep(product_sweep))
 
 
-@hypothesis.given(sweep_lists(allow_empty=False).filter(disjoint_names))
+@ht.given(sweep_lists(allow_empty=False).filter(disjoint_names))
 def test_product_completeness(sweep_list):
     product_sweep = sweeps.product(*sweep_list)
     name_to_values = collections.defaultdict(set)
@@ -130,14 +130,14 @@ def test_empty_table_equals_void():
     assert list(sweeps.table(names=[], value_seqs=[])) == list(sweeps.void())
 
 
-@hypothesis.given(st.integers(), st.lists(st.integers()))
+@ht.given(st.integers(), st.lists(st.integers()))
 def test_single_column_table_equals_all(name, values):
     assert list(sweeps.table([name], [[value] for value in values])) == list(
         sweeps.all(name, values)
     )
 
 
-@hypothesis.given(st.data(), st.lists(st.integers(), min_size=1))
+@ht.given(st.data(), st.lists(st.integers(), min_size=1))
 def test_table_equals_union_of_products_of_singletons(data, names):
     value_seqs = data.draw(st.lists(st.tuples(*([st.integers()] * len(names)))))
 
@@ -157,7 +157,8 @@ def test_table_equals_union_of_products_of_singletons(data, names):
     assert list(table) == list(union)
 
 
-@hypothesis.given(testing.sweeps(with_imports=False, with_includes=False))
+@ht.settings(deadline=500)
+@ht.given(testing.sweeps(with_imports=False, with_includes=False))
 def test_generate_configs_produces_gin_parsable_output(sweep):
     preprocessed_sweep = transforms.preprocess_sweep(sweep, with_partial_eval=False)
     for config in sweeps.generate_configs(preprocessed_sweep):

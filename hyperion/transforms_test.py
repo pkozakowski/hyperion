@@ -1,4 +1,4 @@
-import hypothesis
+import hypothesis as ht
 import pytest
 
 from hyperion import ast
@@ -26,7 +26,7 @@ def _test_partial_idempotence(transform, original):
         transforms.calls_to_evaluated_references,
     ),
 )
-@hypothesis.given(testing.configs())
+@ht.given(testing.configs())
 def test_config_idempotence(transform, config):
     _test_idempotence(transform, config)
 
@@ -38,18 +38,19 @@ def test_config_idempotence(transform, config):
         transforms.preprocess_config,
     ),
 )
-@hypothesis.given(testing.configs())
+@ht.given(testing.configs())
 def test_config_partial_idempotence(transform, config):
     _test_partial_idempotence(transform, config)
 
 
-@hypothesis.given(testing.configs(with_imports=False, with_includes=False))
+@ht.settings(deadline=500)
+@ht.given(testing.configs(with_imports=False, with_includes=False))
 def test_preprocess_config_produces_gin_parsable_output(config):
     with testing.try_with_eval():
         preprocessed_config = transforms.preprocess_config(config)
 
         def assume_not_complex(x):
-            hypothesis.assume(type(x) is not complex)
+            ht.assume(type(x) is not complex)
 
         transforms.fold(assume_not_complex, preprocessed_config)
 
@@ -57,10 +58,10 @@ def test_preprocess_config_produces_gin_parsable_output(config):
 
 
 @pytest.mark.filterwarnings("ignore::SyntaxWarning")
-@hypothesis.given(testing.exprs(for_eval=True))
+@ht.given(testing.exprs(for_eval=True))
 def test_partial_eval_equals_python_eval(expr):
     (rendered_expr, _) = rendering.render(expr)
-    hypothesis.note(f"Rendered expr: {rendered_expr}")
+    ht.note(f"Rendered expr: {rendered_expr}")
     expected_exc = None
     try:
         expected_value = eval(rendered_expr, {}, {})
@@ -78,20 +79,18 @@ def test_partial_eval_equals_python_eval(expr):
         assert not expected_exc and actual_value == expected_value
 
 
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_validate_sweep_accepts_valid_sweeps(sweep):
     transforms.validate_sweep(sweep)
 
 
-@hypothesis.given(
-    testing.sweeps(leaf_sts=[testing.tables(correct=False)], force_block=True)
-)
+@ht.given(testing.sweeps(leaf_sts=[testing.tables(correct=False)], force_block=True))
 def test_validate_sweep_raises_on_incorrect_tables(sweep):
     with pytest.raises(ValueError):
         transforms.validate_sweep(sweep)
 
 
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_remove_prelude_removes_prelude(sweep):
     (filtered_sweep, prelude) = transforms.remove_prelude(sweep)
 
@@ -102,7 +101,7 @@ def test_remove_prelude_removes_prelude(sweep):
     assert all(map(is_prelude, prelude))
 
 
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_remove_prelude_preserves_the_number_of_statements(sweep):
     (filtered_sweep, prelude) = transforms.remove_prelude(sweep)
     assert len(filtered_sweep.statements) + len(prelude) == len(sweep.statements)
@@ -115,7 +114,7 @@ def test_remove_prelude_preserves_the_number_of_statements(sweep):
         transforms.bindings_to_singletons,
     ),
 )
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_sweep_idempotence(transform, sweep):
     _test_idempotence(transform, sweep)
 
@@ -127,12 +126,12 @@ def test_sweep_idempotence(transform, sweep):
         transforms.preprocess_sweep,
     ),
 )
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_sweep_partial_idempotence(transform, sweep):
     _test_partial_idempotence(transform, sweep)
 
 
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_bindings_to_singletons_removes_bindings(sweep):
     transformed_sweep = transforms.bindings_to_singletons(sweep)
 
@@ -143,7 +142,7 @@ def test_bindings_to_singletons_removes_bindings(sweep):
     transforms.fold(fail_on_binding, transformed_sweep)
 
 
-@hypothesis.given(testing.sweeps())
+@ht.given(testing.sweeps())
 def test_flatten_withs_removes_withs(sweep):
     flat_sweep = transforms.flatten_withs(sweep)
 
@@ -154,13 +153,13 @@ def test_flatten_withs_removes_withs(sweep):
     transforms.fold(fail_on_with, flat_sweep)
 
 
-@hypothesis.given(
+@ht.given(
     testing.namespaces(),
     testing.sweeps(with_withs=False, with_imports=False),
 )
 def test_flatten_withs_adds_namespace_prefix(namespace, sweep):
     def assume_no_rvalue_identifiers(node):
-        hypothesis.assume(type(node) not in (ast.Reference, ast.Call))
+        ht.assume(type(node) not in (ast.Reference, ast.Call))
 
     transforms.fold(assume_no_rvalue_identifiers, sweep)
 
@@ -175,7 +174,7 @@ def test_flatten_withs_adds_namespace_prefix(namespace, sweep):
     transforms.fold(assert_namespace_has_prefix, flattened_sweep)
 
 
-@hypothesis.given(testing.namespaces(), testing.sweeps(with_withs=False))
+@ht.given(testing.namespaces(), testing.sweeps(with_withs=False))
 def test_flatten_withs_preserves_inner_structure(namespace, sweep):
     with_sweep = ast.Sweep(statements=(ast.With(namespace, sweep.statements),))
     flattened_sweep = transforms.flatten_withs(with_sweep)
