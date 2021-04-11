@@ -2,13 +2,12 @@ sweep: _NL? _nls_list{prelude_statement}? statement*
 
 ?statement: binding _NL
           | all _NL
+          | _block{with_header,statement}       -> with_
           | _block{"product",statement}    -> product
           | _block{"union",statement}      -> union
           | _block{table_header,table_row} -> table
 
 all: identifier ":" _LBRACKET cs_list{expr} _RBRACKET
-
-_block{header,line}: header ":" _NL _INDENT line+ _DEDENT
 
 table_header: "table" _columns
 _columns: _cs_list{identifier}
@@ -16,8 +15,9 @@ _columns: _cs_list{identifier}
 
 table_row: _cs_list{expr} _NL
 
-%import config (prelude_statement, binding, _nls_list)
-%import config (identifier, expr, _cs_list, cs_list, _NL, COMMENT)
+%import config (prelude_statement, binding, with_header)
+%import config (_nls_list, _block, _INDENT, _DEDENT, _NL)
+%import config (identifier, expr, _cs_list, cs_list, COMMENT)
 %import config (_LPAREN, _RPAREN, _LBRACKET, _RBRACKET, _LBRACE, _RBRACE)
 
 %import common.WS_INLINE
@@ -25,5 +25,3 @@ table_row: _cs_list{expr} _NL
 
 %ignore WS_INLINE
 %ignore COMMENT
-
-%declare _INDENT _DEDENT

@@ -22,6 +22,50 @@ def fold(f, tree):
     return f(tree)
 
 
+def flatten_withs(tree):
+    def flatten_node(node):
+        def add_namespace_to_subtree(namespace, statement):
+            def add_to_identifier(identifier):
+                return identifier._replace(
+                    namespace=identifier.namespace._replace(
+                        path=(namespace.path + identifier.namespace.path),
+                    )
+                )
+
+            def add_to_node(node):
+                if type(node) in (ast.Binding, ast.All):
+                    node = node._replace(identifier=add_to_identifier(node.identifier))
+                elif type(node) is ast.Header:
+                    node = node._replace(
+                        identifiers=tuple(map(add_to_identifier, node.identifiers)),
+                    )
+                return node
+
+            return fold(add_to_node, statement)
+
+        if hasattr(node, "statements"):
+            # Block.
+            statements = []
+            for statement in node.statements:
+                if type(statement) is ast.With:
+                    statements.extend(
+                        [
+                            add_namespace_to_subtree(
+                                statement.namespace, inner_statement
+                            )
+                            for inner_statement in statement.statements
+                        ]
+                    )
+                else:
+                    statements.append(statement)
+            node = node._replace(statements=tuple(statements))
+
+        return node
+
+    # O(n^2) complexity in the depth of the `with` and other blocks, but that's fine.
+    return fold(flatten_node, tree)
+
+
 def eval_unary_op(operator, operand):
     return getattr(operator_lib, operator)(operand)
 
@@ -131,6 +175,7 @@ def calls_to_evaluated_references(config):
 
 
 def preprocess_config(config, with_partial_eval=True):
+    config = flatten_withs(config)
     if with_partial_eval:
         config = partial_eval(config)
     config = expressions_to_calls(config)
@@ -169,7 +214,7 @@ def bindings_to_singletons(sweep):
         return ast.All(binding.identifier, (binding.expr,))
 
     def transform_block(block):
-        return type(block)(
+        return block._replace(
             statements=tuple(
                 binding_to_singleton(statement)
                 if type(statement) is ast.Binding
@@ -179,7 +224,7 @@ def bindings_to_singletons(sweep):
         )
 
     def transform_node(node):
-        if type(node) in (ast.Sweep, ast.Product):
+        if type(node) in (ast.Sweep, ast.Product, ast.With):
             return transform_block(node)
 
         if type(node) is ast.Union:

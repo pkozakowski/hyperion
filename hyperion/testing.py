@@ -17,7 +17,7 @@ from hyperion import rendering
 from hyperion import transforms
 
 
-max_size = 2
+global_max_size = 2
 
 
 def unary_operators(safe):
@@ -40,7 +40,7 @@ def binary_operators(safe):
 def strings(draw):
     string_st = st.text(
         alphabet=st.characters(blacklist_categories=("C", "Zl", "Zp")),
-        max_size=max_size,
+        max_size=global_max_size,
     )
     return ast.String(draw(string_st))
 
@@ -63,7 +63,7 @@ def names(draw):
         rest = draw(
             st.text(
                 alphabet=chars(nondigits + string.digits),
-                max_size=(max_size - 1),
+                max_size=(global_max_size - 1),
             )
         )
         name = first + rest
@@ -77,7 +77,7 @@ def macros(draw):
 
 
 def internal_lists(item_st, allow_empty=True, **kwargs):
-    list_kwargs = {"max_size": max_size}
+    list_kwargs = {"max_size": global_max_size}
     if not allow_empty:
         list_kwargs["min_size"] = 1
     list_kwargs.update(kwargs)
@@ -90,7 +90,7 @@ def scopes(draw):
 
 
 @st.composite
-def namespaces(draw, min_size, max_size):
+def namespaces(draw, min_size=1, max_size=global_max_size):
     path_st = internal_lists(names(), min_size=min_size, max_size=max_size)
     return ast.Namespace(path=tuple(draw(path_st)))
 
@@ -102,10 +102,10 @@ def identifiers(draw, with_module=False, flat=False):
     else:
         scope = draw(scopes())
     min_size = 2 if with_module else 1
-    local_max_size = min_size if flat else max_size
+    max_size = min_size if flat else global_max_size
     return ast.Identifier(
         scope=scope,
-        namespace=draw(namespaces(min_size=min_size, max_size=local_max_size)),
+        namespace=draw(namespaces(min_size=min_size, max_size=max_size)),
         name=draw(names()),
     )
 
@@ -212,7 +212,7 @@ def exprs(for_eval=False, safe=False):
 
 @st.composite
 def imports(draw):
-    return ast.Import(namespace=draw(namespaces(min_size=1, max_size=max_size)))
+    return ast.Import(namespace=draw(namespaces(min_size=1, max_size=global_max_size)))
 
 
 @st.composite
@@ -237,6 +237,18 @@ def prelude_statements(with_imports, with_includes):
     return st.one_of(*statement_sts)
 
 
+def config_statement_extend(statement_st):
+    return with_extend(statement_st)
+
+
+def config_statements(leaf_sts, flat):
+    leaf_st = st.one_of(*leaf_sts)
+    if flat:
+        return leaf_st
+    else:
+        return st.recursive(leaf_st, config_statement_extend, max_leaves=2)
+
+
 @st.composite
 def configs(draw, with_imports=True, with_includes=True, safe=False, flat=False):
     if with_imports or with_includes:
@@ -244,8 +256,9 @@ def configs(draw, with_imports=True, with_includes=True, safe=False, flat=False)
     else:
         prelude = ()
 
-    bds = draw(internal_lists(bindings(safe=safe, flat=flat)))
-    return ast.Config(statements=(tuple(prelude) + tuple(bds)))
+    leaf_sts = [bindings(safe=safe, flat=flat)]
+    statements = draw(internal_lists(config_statements(leaf_sts, flat=flat)))
+    return ast.Config(statements=(tuple(prelude) + tuple(statements)))
 
 
 @st.composite
@@ -290,7 +303,7 @@ def tables(draw, correct=True):
     return table
 
 
-def make_blocks(block_type):
+def make_block_extend(block_type):
     @st.composite
     def blocks(draw, statement_st):
         statements = draw(internal_lists(statement_st, min_size=1))
@@ -299,15 +312,27 @@ def make_blocks(block_type):
     return blocks
 
 
-def sweep_statement_extend(statement_st):
-    extends = [make_blocks(ast.Product), make_blocks(ast.Union)]
+@st.composite
+def with_extend(draw, statement_st):
+    namespace = draw(namespaces(min_size=1, max_size=global_max_size))
+    statements = draw(internal_lists(statement_st, min_size=1))
+    return ast.With(namespace=namespace, statements=tuple(statements))
+
+
+def sweep_statement_extend(statement_st, with_withs):
+    extends = [
+        make_block_extend(ast.Product),
+        make_block_extend(ast.Union),
+    ]
+    if with_withs:
+        extends.append(with_extend)
     return st.one_of(*(extend(statement_st) for extend in extends))
 
 
-def sweep_statements(leaf_sts, with_imports):
+def sweep_statements(leaf_sts, with_withs):
     return st.recursive(
         st.one_of(*leaf_sts),
-        sweep_statement_extend,
+        functools.partial(sweep_statement_extend, with_withs=with_withs),
         max_leaves=2,
     )
 
@@ -317,6 +342,7 @@ def sweeps(
     draw,
     with_imports=True,
     with_includes=True,
+    with_withs=True,
     force_block=False,
     leaf_sts=None,
     allow_empty=True,
@@ -329,13 +355,14 @@ def sweeps(
     leaf_sts = leaf_sts or [bindings(safe=False), alls(), tables()]
     statements = draw(
         internal_lists(
-            sweep_statements(leaf_sts, with_imports=with_imports),
-            allow_empty=allow_empty,
+            sweep_statements(leaf_sts, with_withs=with_withs), allow_empty=allow_empty
         )
     )
     if force_block:
         index = draw(st.integers(min_value=0, max_value=len(statements)))
-        block = draw(sweep_statement_extend(st.one_of(*leaf_sts)))
+        block = draw(
+            sweep_statement_extend(st.one_of(*leaf_sts), with_withs=with_withs)
+        )
         statements.insert(index, block)
     return ast.Sweep(statements=(tuple(prelude) + tuple(statements)))
 
@@ -362,6 +389,8 @@ def gin_sandbox():
 
 
 def extract_used_configurables(config):
+    config = transforms.flatten_withs(config)
+
     configurable_to_parameters = collections.defaultdict(set)
 
     def render_module(path):

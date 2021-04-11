@@ -235,13 +235,16 @@ def test_parse_sweep_succeeds_with_prelude(tmpdir_factory, sweep):
 @ht.settings(**settings)
 @ht.given(sweeps_without_prelude)
 def test_parse_sweep_produces_different_configs(sweep):
-    preprocessed_sweep = transforms.bindings_to_singletons(sweep)
-    configs = set(sweeps.generate_configs(preprocessed_sweep))
+    preprocessed_sweep = transforms.bindings_to_singletons(
+        transforms.flatten_withs(sweep)
+    )
+    with testing.try_with_eval():
+        configs = set(sweeps.generate_configs(preprocessed_sweep))
 
-    rendered_sweep = rendering.render(sweep)
-    rendered_configs = set(e2e.parse_sweep(rendered_sweep))
+        rendered_sweep = rendering.render(sweep)
+        rendered_configs = set(e2e.parse_sweep(rendered_sweep))
 
-    assert len(rendered_configs) == len(configs)
+        assert len(rendered_configs) == len(configs)
 
 
 @ht.settings(**settings)

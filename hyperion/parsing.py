@@ -37,6 +37,10 @@ class ConfigTransformer(lark.Transformer):
     def call(self, identifier, arguments=()):
         return ast.Call(identifier, tuple(arguments))
 
+    @lark.v_args(inline=True)
+    def with_(self, namespace, *statements):
+        return ast.With(namespace, tuple(statements))
+
     config = lambda self, statements: ast.Config(tuple(statements))
     import_ = ast.Import._make
     include = lambda self, tokens: ast.Include(path=ast.String.from_tokens(tokens))
@@ -150,6 +154,7 @@ def remove_parentheses(tree):
 
 
 def parse_config(text):
+    text += "\n"
     parse_tree = config_grammar.parse(text)
     tree = ConfigTransformer().transform(parse_tree)
     # We only need parentheses for resolving ambiguities, so we remove them
