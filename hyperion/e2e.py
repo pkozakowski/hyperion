@@ -52,7 +52,7 @@ def parse_config(bindings, skip_unknown=False):
 
 # With the default file reader overridden, we can use gin_module.parse_config_file.
 def parse_config_file(config_file):
-    return gin_module.parse_config_file()
+    return gin_module.parse_config_file(config_file)
 
 
 def parse_config_files_and_bindings(

@@ -499,8 +499,8 @@ def try_with_eval():
     try:
         yield
     except Exception as e:
-        if type(e) not in allowed_eval_exceptions:
-            raise
+        hypothesis.assume(type(e) not in allowed_eval_exceptions)
+        raise
 
 
 def constants_to_macros(config):
