@@ -1,0 +1,8 @@
+Transformer.d_model = 1024
+Transformer.d_ff = 4096
+Transformer.n_heads = 8
+Transformer.n_layers = 6
+
+train.model_class = @Transformer
+train.learning_rate = 0.001
+train.n_steps = 100000

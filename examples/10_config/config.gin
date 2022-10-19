@@ -1,0 +1,14 @@
+d_model = 2048
+d_ff_mul = 4
+batch_size = 64
+
+with Transformer:
+    d_model = %d_model
+    d_ff = %d_model * %d_ff_mul
+    n_heads = 8
+    n_layers = 6
+
+with train:
+    model_class = @Transformer
+    learning_rate = @compute_learning_rate(base=0.001, batch_size=%batch_size)
+    n_steps = 100000

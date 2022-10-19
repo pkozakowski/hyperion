@@ -1,0 +1,8 @@
+include 'my_transformer.gin'
+
+product:
+    Transformer.n_layers: [4, 6, 8, 10]
+
+    union:
+        Transformer.d_model: [512, 1024, 2048]
+        Transformer.d_ff: [2048, 4096, 8192]
