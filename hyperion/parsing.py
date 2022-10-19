@@ -134,7 +134,7 @@ def open_grammar(name, start):
         import_paths=[grammar_path],
         start=start,
         parser="earley",
-        lexer="standard",
+        lexer="basic",
         ambiguity="explicit",
         postlex=BlockIndenter(),
     )
