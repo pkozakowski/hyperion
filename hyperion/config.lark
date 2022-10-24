@@ -103,7 +103,7 @@ _RBRACE: "}"
 
 _NL: /(\r?\n[\t ]*)+/
 
-COMMENT: _COMMENT _NL
+COMMENT: _COMMENT
 
 %import common.CNAME -> NAME
 %import common.NUMBER

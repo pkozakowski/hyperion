@@ -2,27 +2,38 @@ import ast as python_ast
 import collections
 
 
+# Modification of namedtuple that takes the type name into account when hashing.
+def hashable_namedtuple(name, fields):
+    namedtuple_class = collections.namedtuple(name, fields)
+
+    def hash_with_name(self):
+        return hash((namedtuple_class.__name__, tuple(self)))
+
+    namedtuple_class.__hash__ = hash_with_name
+    return namedtuple_class
+
+
 # Configs:
 
-Config = collections.namedtuple("Config", ["statements"])
-Import = collections.namedtuple("Import", ["namespace"])
-Include = collections.namedtuple("Include", ["path"])
-Namespace = collections.namedtuple("Namespace", ["path"])
-Binding = collections.namedtuple("Binding", ["identifier", "expr"])
-Identifier = collections.namedtuple("Identifier", ["scope", "namespace", "name"])
-Scope = collections.namedtuple("Scope", ["path"])
-With = collections.namedtuple("With", ["namespace", "statements"])
-Macro = collections.namedtuple("Macro", ["name"])
-Reference = collections.namedtuple("Reference", ["identifier"])
-UnaryOp = collections.namedtuple("UnaryOp", ["operator", "operand"])
-BinaryOp = collections.namedtuple("BinaryOp", ["left", "operator", "right"])
-Parenthesis = collections.namedtuple("Parenthesis", ["expr"])
-Dict = collections.namedtuple("Dict", ["items"])
-List = collections.namedtuple("List", ["items"])
-Tuple = collections.namedtuple("Tuple", ["items"])
+Config = hashable_namedtuple("Config", ["statements"])
+Import = hashable_namedtuple("Import", ["namespace"])
+Include = hashable_namedtuple("Include", ["path"])
+Namespace = hashable_namedtuple("Namespace", ["path"])
+Binding = hashable_namedtuple("Binding", ["identifier", "expr"])
+Identifier = hashable_namedtuple("Identifier", ["scope", "namespace", "name"])
+Scope = hashable_namedtuple("Scope", ["path"])
+With = hashable_namedtuple("With", ["namespace", "statements"])
+Macro = hashable_namedtuple("Macro", ["name"])
+Reference = hashable_namedtuple("Reference", ["identifier"])
+UnaryOp = hashable_namedtuple("UnaryOp", ["operator", "operand"])
+BinaryOp = hashable_namedtuple("BinaryOp", ["left", "operator", "right"])
+Parenthesis = hashable_namedtuple("Parenthesis", ["expr"])
+Dict = hashable_namedtuple("Dict", ["items"])
+List = hashable_namedtuple("List", ["items"])
+Tuple = hashable_namedtuple("Tuple", ["items"])
 
 
-class Call(collections.namedtuple("Call", ["identifier", "arguments"])):
+class Call(hashable_namedtuple("Call", ["identifier", "arguments"])):
     @classmethod
     def _make(cls, items):
         items = list(items)
@@ -108,10 +119,10 @@ def operator_precedence(operator):
 
 # Sweeps:
 
-Sweep = collections.namedtuple("Sweep", ["statements"])
-All = collections.namedtuple("All", ["identifier", "exprs"])
-Product = collections.namedtuple("Product", ["statements"])
-Union = collections.namedtuple("Union", ["statements"])
-Table = collections.namedtuple("Table", ["header", "rows"])
-Header = collections.namedtuple("Header", ["identifiers"])
-Row = collections.namedtuple("Row", ["exprs"])
+Sweep = hashable_namedtuple("Sweep", ["statements"])
+All = hashable_namedtuple("All", ["identifier", "exprs"])
+Product = hashable_namedtuple("Product", ["statements"])
+Union = hashable_namedtuple("Union", ["statements"])
+Table = hashable_namedtuple("Table", ["header", "rows"])
+Header = hashable_namedtuple("Header", ["identifiers"])
+Row = hashable_namedtuple("Row", ["exprs"])

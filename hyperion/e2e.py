@@ -5,6 +5,7 @@ import gin as gin_module
 
 from hyperion import parsing
 from hyperion import rendering
+from hyperion import runtime
 from hyperion import sweeps
 from hyperion import transforms
 
@@ -39,6 +40,7 @@ def register(gin):
 
 
 register(gin_module)
+runtime.register(gin_module)
 
 
 # Implementation of the Gin API:
