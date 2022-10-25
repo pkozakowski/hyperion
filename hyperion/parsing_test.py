@@ -10,7 +10,7 @@ settings = {
     # Disable the shrinking phase - it's really slow for parsing.
     "phases": (ht.Phase.explicit, ht.Phase.reuse, ht.Phase.generate, ht.Phase.target),
     # Extend the deadline to fit more complex trees.
-    "deadline": 500,
+    "deadline": 1000,
     # Lower the number of examples to match.
     "max_examples": 50,
 }
