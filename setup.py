@@ -4,8 +4,8 @@ from setuptools import setup
 
 setup(
     name="hyperion",
-    description="hyperparameter sweeps on steroids",
-    version="0.0.1",
+    description="Configuration tool for ML hyperparameter sweeps.",
+    version="0.1.0",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
