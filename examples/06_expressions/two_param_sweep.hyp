@@ -1,0 +1,7 @@
+include 'my_transformer.gin'
+
+d_model: [512, 1024, 2048]
+d_ff_mul: [1, 2, 4]
+
+Transformer.d_model = %d_model
+Transformer.d_ff = %d_model * %d_ff_mul

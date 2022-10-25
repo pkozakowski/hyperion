@@ -24,7 +24,7 @@ settings = {
     # Disable the shrinking phase - it's really slow for parsing.
     "phases": (ht.Phase.explicit, ht.Phase.reuse, ht.Phase.generate, ht.Phase.target),
     # Extend the deadline to fit more complex trees.
-    "deadline": 500,
+    "deadline": 1000,
     # These tests just check the plumbing - we don't need that many examples.
     "max_examples": 10,
 }
@@ -64,6 +64,10 @@ def _try_to_parse_sweep_configs(config_stream, sweep_to_register=None):
             with testing.try_in_gin_sandbox(sweep_to_register) as gin:
                 runtime.register(gin)
                 e2e.register(gin)
+
+                # Raise any eval exceptions first, before Gin wraps them up.
+                e2e._hyperion_to_gin(rendered_config)
+
                 gin.parse_config(rendered_config)
 
             _unload_configurables()

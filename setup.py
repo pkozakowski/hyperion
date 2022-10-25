@@ -20,4 +20,7 @@ setup(
             "pytest-cov",
         ],
     },
+    scripts=[
+        "scripts/hyperion",
+    ],
 )

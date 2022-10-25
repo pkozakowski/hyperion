@@ -1,0 +1,3 @@
+include 'my_transformer.gin'  # Load the base config.
+
+Transformer.d_model: [512, 1024, 2048]

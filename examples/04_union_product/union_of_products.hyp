@@ -1,0 +1,17 @@
+include 'my_transformer.gin'
+
+union:
+    product:
+        Transformer.d_ff = 2048
+        Transformer.d_model: [512, 1024, 2048]
+        Transformer.n_layers: [4, 6, 8, 10]
+
+    product:
+        Transformer.d_ff = 4096
+        Transformer.d_model: [512, 1024, 2048]
+        Transformer.n_layers: [4, 6, 8] # Limit the number of layers.
+
+    product:
+        Transformer.d_ff = 8192
+        Transformer.d_model: [512, 1024] # Limit d_model too.
+        Transformer.n_layers: [4, 6, 8]

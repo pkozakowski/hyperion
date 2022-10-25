@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import argparse
+import os
+
+import hyperion
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Hyperion config generator.')
+    parser.add_argument('sweep', help='sweep file')
+    parser.add_argument('output_dir', help='directory to output the configs to')
+    args = parser.parse_args()
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    (name_core, _) = os.path.splitext(os.path.basename(args.sweep))
+
+    for (i, config) in enumerate(hyperion.parse_sweep_file(args.sweep)):
+        filename = os.path.join(args.output_dir, f'{name_core}_{i}.gin')
+        with open(filename, 'w') as f:
+            f.write(config)

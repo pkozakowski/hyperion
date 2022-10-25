@@ -1,0 +1,5 @@
+include 'my_transformer.gin'
+
+batch_size: [64, 128, 256]
+
+train.learning_rate = @compute_learning_rate(base=0.001, batch_size=%batch_size)
