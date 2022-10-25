@@ -59,13 +59,13 @@ However, one thing that Gin cannot do is define hyperparameter sweeps. If you wa
 
 That's where Hyperion comes in! This tool allows you to define hyperparameter sweeps using a syntax similar to Gin. It also introduces new features for writing configs, including [expressions](#expressions).
 
-## Hyperparameter sweeps
-
-First install:
+To install, run:
 
 ```bash
 pip install https://github.com/pkozakowski/hyperion/releases/download/v0.1.0/hyperion-0.1.0-py3-none-any.whl
 ```
+
+## Hyperparameter sweeps
 
 Let's say you want to tune the dimensionality of the above model. Hyperion makes it easy:
 
