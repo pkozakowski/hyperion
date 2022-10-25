@@ -24,7 +24,7 @@ settings = {
     # Disable the shrinking phase - it's really slow for parsing.
     "phases": (ht.Phase.explicit, ht.Phase.reuse, ht.Phase.generate, ht.Phase.target),
     # Extend the deadline to fit more complex trees.
-    "deadline": 500,
+    "deadline": 1000,
     # These tests just check the plumbing - we don't need that many examples.
     "max_examples": 10,
 }
