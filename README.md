@@ -61,6 +61,12 @@ That's where Hyperion comes in! This tool allows you to define hyperparameter sw
 
 ## Hyperparameter sweeps
 
+First install:
+
+```bash
+pip install https://github.com/pkozakowski/hyperion/releases/download/v0.1.0/hyperion-0.1.0-py3-none-any.whl
+```
+
 Let's say you want to tune the dimensionality of the above model. Hyperion makes it easy:
 
 ```python
